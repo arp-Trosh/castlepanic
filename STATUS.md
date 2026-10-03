@@ -23,7 +23,8 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
 - **Banners** (`banner.py`, `fonts.py`): 3D lettering in front of the camera. A new siege opens with three gold
   lines, the war horn (`start`), "tHe mOnsTeRs aRe CoMing!" in castle blocks, then the first six Monsters march
   in together. That announcement comes before the first new Monsters of every turn, and "Your turn. Defend the
-  Castle!" at the start of yours. Space/Enter/Esc hurries a banner away.
+  Castle!" at the start of yours. A Boss Monster announces its power in gold (`BOSS_BANNER` in scene.py)
+  as it arrives. Space/Enter/Esc hurries a banner away.
 - **On the board**: ring names (Arc/Kni/Swo) on the three lines where the colours change, placed so they never
   overlap each other or a Monster's label (a line shows whole or not at all; zoomed far out, only the nearest line).
   Monster tags (GK OW TM HL TR OR GO) before the health pips (`SHOW_TAGS` in ui.py to drop them). The camera eases

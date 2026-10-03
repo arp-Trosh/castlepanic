@@ -43,6 +43,13 @@ TOKEN_BANNER = {
     "discard1": ["All players", "discard a card!"], "draw3": ["Draw three", "more Monsters!"],
     "draw4": ["Draw four", "more Monsters!"],
 }
+# what a Boss Monster's power does, announced in gilt lettering as it arrives
+BOSS_BANNER = {
+    "orc_warlord": ["All Monsters of", "the same color", "move one space!"],
+    "healer": ["All Monsters", "heal one!"],
+    "troll_mage": ["All Monsters on", "the board", "move one space!"],
+    "goblin_king": ["Draw three", "more Monsters!"],
+}
 CROWD_SCALE = {1: 1.0, 2: 0.85}  # Monsters sharing a space shrink a little to fit (three or more: CROWDED)
 CROWDED = 0.7
 HOME_AFTER = 1.0  # seconds after the action ends that the camera eases back to the whole-board view
@@ -622,6 +629,13 @@ class BoardScene:
         def after():
             self.wait = TOKEN_AFTER
         self.banner(TOKEN_BANNER.get(e["kind"], ["A Monster!"]), "gilt", then=after, hold=TOKEN_HOLD)
+
+    def _ev_boss_power(self, e):
+        """A Boss Monster has arrived: what its power does, in gilt lettering, before it takes effect."""
+        def after():
+            self.wait = TOKEN_AFTER
+        self.rig.go_home()
+        self.banner(BOSS_BANNER[e["kind"]], "gilt", then=after, hold=TOKEN_HOLD + 0.4)
 
     def _ev_spawn(self, e):
         if e["mid"] in self.monsters:

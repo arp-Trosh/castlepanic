@@ -641,6 +641,7 @@ class Game:
             arc = self.rng.randrange(ARCS)
             self.events.append(Event("roll", value=arc + 1))
             m = self._spawn(kind, arc)
+            self.events.append(Event("boss_power", kind=kind, mid=m["id"]))
             if kind == "goblin_king":
                 self.to_draw += 3
             elif kind == "orc_warlord":
