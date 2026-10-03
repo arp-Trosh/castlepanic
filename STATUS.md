@@ -29,8 +29,7 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
 - **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections on the menu's Settings
   screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
   shows only the frame rate (achieved/target, clickable).
-- **Needs unicode3d after v0.10.0** (f19d26a: camera parents, `DisplayControls(show=...)`, block lettering):
-  requirements.txt still pins v0.10.0 until that is released.
+- **unicode3d v0.11.0** (camera parents, `DisplayControls(show=...)`, block lettering), pinned in requirements.txt.
 - **Sound** (`sound.py`): 33 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all.
 - **Assets**: 21 models by Blender scripts in `assets/src/` (kit + STYLE.md), exported to `castlepanic/data/models/`.

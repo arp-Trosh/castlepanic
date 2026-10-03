@@ -42,7 +42,7 @@
   each track's keyframe search and lerp/slerp, per node). 11 animated models: 6-7 ms of a 30 ms frame.
 - **`Screen.picture()` draws box-drawing characters as empty boxes**: Pillow's default font has none, so every
   panel border and button in the screenshots is a row of tofu.
-- **Built in unicode3d after 0.10.0 (f19d26a, unreleased) from the notes above, and used here:** `fonts.font()`
+- **Built in unicode3d 0.11.0 from the notes above, and used here:** `fonts.font()`
   (fonts.py), `bitmap_mesh(blocks=True)` (the stone banner style), a Camera as a parent plus `height_at()`
   (banner.py: no basis maths), `DisplayControls(show=("fps",))` with `settings()`/`apply()` (ui.py: the
   bottom-right readout is now the clickable "F4 31/30fps"; settings.py only reads and writes the file), and
