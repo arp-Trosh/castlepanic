@@ -1,0 +1,38 @@
+1) Need an easy way to identify the Archer, Knight, and Swordsman rings. A text label should be sufficient for this instead of using a graphic. To save space, use abbreviatons: "Arc, "Kni", "Swo". They would take up too much space on the screen if they were placed on every single space. Instead, place them on the lines leading up to the castle that divide space color changes. Take care to pay special attention to the placement of these labels when zooming and panning around. 
+
+2) The game begins too abruptly, the monsters are already spawned when you load into the game. Make it more of an event by displaying in Fantasy style 3d text 
+"We're being attacked by monsters!"
+"Defend the castle!"
+"Fight! Fight! Never surrender!"
+
+THEN play the start sound.
+
+Then spawn the 1st wave of monsters.
+
+2a) The spawning of monsters should be announced by a 3d graphic text stylized like castle blocks. "tHe mOnsTeRs aRe CoMing!". A half second after the announcment, the monster(s) spawn.
+2b) When it is the player's turn, a "Your turn. Defend the Castle!" comes up in the same stylized 3d castle block text.
+
+3) Remove the UI options at the bottom of the screen except FPS.
+    Place all graphics options in a separate "Settings" menu on the main screen.
+
+5) Monsters need to be identified easily.
+Use these labels above the monster models:
+"GK" - goblin king
+"OW" - Orc Warlord
+"TM" - Troll Mage
+"HL" - Healer
+"TR" - Troll
+"OR" - Orc
+"GO" - Goblin
+
+This is just to see if it works out; might remove it later.
+
+
+6) Bug found in single player. Camera got stuck focused on a troll (I think it was a troll?). 
+
+7) The people standing on the castle are facing the wrong direction. They should be facing away from the castle, not towards it.
+
+8) Add a physical end turn button.
+
+9) Autoswitch view back to default a second after the combat animations end.
+
