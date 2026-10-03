@@ -1,0 +1,29 @@
+Using 100% python and the unicode3d graphics engine, we will create a terminal based 3d version of the boardgame "Castle Panic". Must be cross platform for at least Linux & Windows.
+
+
+Visual Direction:
+Visually, the primary goal is to graphically represent the game in 3D. The castle and the walls, monsters, boulders, all game pieces, will be represented by 3D models on a tabletop matt (similar to the one in the physical board game). When actions happen in the game, the actions should be respesnted my animations of the 3d models. Attacking would animate by swinging swords, loosing arrows. Taking damage would animate by a monster stumbling or bleeding/losing limbs. The boulders can roll out and into the sides of the screen, kicking up dust and debris as they tumble along, knocking over and crushing all and anything in its path. 3D models that are standing idle in the game (not doing or receiving an action) will have a set of "fidget" clips, where they might sway side to side, scratch their head, inspect their weapon (if they have one), look around, etc. 
+
+Sound Direction: Nothing too fancy. Basic game sounds when things happen in the game and turns change. Use minimal and light dependencies for the sound. Monsters can make noises, humans can yell and say things, boulders make rolling crushing sounds (when they hit something), and so on. 
+
+Single/Multiplayer: Can be played by 1 to 6 players. Game must have a Single Player mode against bot players in addition to the 1 player mode that the board game accomodates. Multiplayer will be old-school style with Host and Join options. Default port is 5555. Once a game is hosted, the game will go into lobby mode and wait for players to join. Include option to fill empty player spots with bots, or reduce the number of players. Host can begin game when everything is ready. In Multiplayer, there should be a chat window at the bottom of the screen.
+
+Asset protocol: All assets must be 100% original. I have blender installed on this machine, it can be used with the scripts in the u3dAssGen folder to create 3d models for the game, among other ideas you might have. Use the Opus 5.5 model at lowest effort when creating assets, speed and token efficiency are paramount for this part. Abiding by the artwork style direction will be more valuable (especially at terminal rendering resolutions).
+
+Artwork Style: Think 80's era Dungeons and Dragons. Retro fantasy. Grandiose and Epic. Aim for a low-polygon style, but AVOID CARTOONISH LOOK. AVOID ROBLOX, MINECRAFT, OR LEGO STYLE LOOK. Go for grimdark fantasy. Think Everquest style for models. Colors used on a model should employ sound color theory to have appealing colorschemes (similiar to how miniature models are painted in warhammer). 
+
+Photos of the boardgame to inform general layout of the game and pieces:
+Reference folder "Photos"
+
+
+Reference the rules at the following Web Addresse:
+
+Main Rules: https://www.ultraboardgames.com/castle-panic/game-rules.php
+The cards: https://www.ultraboardgames.com/castle-panic/cards.php
+The Monsters: https://www.ultraboardgames.com/castle-panic/monsters.php
+Solitaire Game Rules (For 1 player):
+"Castle Panic can even be played as a solo game by just one player.
+
+All the standard rules apply to the solitaire version with the exception that the player deals a hand of 6 cards and may Discard and Draw 2 cards instead of just 1.
+
+Be prepared for a challenging game!"

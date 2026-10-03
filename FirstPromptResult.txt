@@ -1,0 +1,70 @@
+Castle Panic: result of the first session (2026-10-02)
+=====================================================
+
+Castle Panic is playable end to end: run `.venv/bin/python -m castlepanic` from the project folder. You get a
+menu, single player with 1-6 seats (1 is the solo variant), Host on port 5555 with a lobby, or Join. Everything
+has only been tested off-screen, never in a real terminal or on Windows, and I couldn't hear any of the sounds.
+
+What's tested
+-------------
+- Rules: 300 all-bot games finish with every card and token accounted for.
+- Networking: host and join, the lobby, bots filling empty seats, chat, turns played over the network, an
+  out-of-turn move rejected without a crash, and a player who leaves being replaced by a bot.
+- 3D game: two complete bot games played through the 3D scene without anything hanging.
+- Screen: a scripted run of the menu and game screens, with screenshots.
+
+What's in it
+------------
+- Rules: the full game plus the solo variant (hand of 6, discard up to 2). Everything is also written out in a
+  log, so you can follow the game without the graphics.
+- 3D: a painted mat on a dark wooden table, a forest ring of trees, and towers flying banners in their arc's
+  colour. Sentries on the walls fidget while idle.
+- Animations: monsters march in, archers loose arrows, and knights and the barbarian charge out. Hits and deaths
+  draw blood, walls and towers crumble into rubble with dust, and the Giant Boulder rolls across crushing
+  everything in its path. The camera swings to each action.
+- Assets: 21 original models in the low-poly, grim style, built by Opus subagents from Blender scripts using a
+  shared style guide (assets/src/kit.py, assets/STYLE.md), exported to castlepanic/data/models/.
+- Sound: 32 synthesized sounds (horns, bow twangs, growls, yells, crashes, the boulder's rumble) with nothing
+  extra to install. `python -m castlepanic.sound` plays them all.
+- Controls: number keys or clicks for cards, letters or clicks for targets, X discard, T trade, E end turn,
+  H help, chat on Tab in multiplayer.
+
+Problems and gaps
+-----------------
+- Frame rate: about 50-90 ms per frame mid-game, roughly 11-20 fps. Most of it is in the engine (see below).
+- Bots: they win only about 16% of games: 36% solo, about 2% with 6 players. That's after a lookahead
+  improvement, and they can get better.
+- Unconfirmed rule details: the rule pages don't give the mix of special monster tokens or the bosses' hit
+  points. Both are my best reconstruction (move_<colour> x2 each, draw3 x1, draw4 x1; King 2, Warlord 3,
+  Mage 3, Healer 2 HP); the deck matches published counts.
+- Models: some read dark at whole-board zoom. A few hands don't grip their weapon handles, and the orc warlord
+  is murky.
+- Asset agents: they ran on Opus but not at low effort, because the agent definition that sets low effort
+  (.claude/agents/asset-builder.md) only loads in a new session.
+- Not done: Windows packaging.
+
+Engine findings so far (all in ENGINE_NOTES.md)
+-----------------------------------------------
+- The biggest one: the renderer works out every model part's position in plain Python, costing about 55 µs per
+  part per frame. With characters at 50-90 parts each, that takes most of the frame. (Now at the top of
+  ../unicode3droadmap.md as the next patch.)
+- There's no way to copy an animated model cheaply, so I wrote that in the game.
+- There's no blending between animation clips, so I wrote that too.
+- Model.world_bounds() costs about 5 ms per call.
+- merge_meshes drops textures.
+- Screen text is limited to the 8 basic colours.
+- The terminal-screenshot helper isn't part of the public API.
+- Texture v orientation for hand-built meshes (Mesh.uvs) is undocumented.
+
+Where things are
+----------------
+- STATUS.md: the full done/next list.
+- castlepanic/: rules.py, bots.py, session.py, net.py, scene.py, actors.py, fx.py, board.py, ui.py, sound.py,
+  narrate.py, snap.py, __main__.py
+- tests/: test_rules.py, test_net.py (python -m unittest)
+- tools/: preview.py (terminal-accurate model contact sheets), scene_game.py (bot game through the scene,
+  off-screen), ui_test.py (scripted UI run with screenshots), snapshot.py, scene_test.py
+- assets/src/: the Blender scripts; assets/previews/: rendered previews (git-ignored)
+
+Sources for the rules: ultraboardgames.com Castle Panic rules, cards and monsters pages; card and monster counts
+from search results (BoardGameGeek, the Castle Panic Deluxe Kickstarter FAQ).
