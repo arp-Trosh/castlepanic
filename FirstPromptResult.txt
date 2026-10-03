@@ -68,3 +68,13 @@ Where things are
 
 Sources for the rules: ultraboardgames.com Castle Panic rules, cards and monsters pages; card and monster counts
 from search results (BoardGameGeek, the Castle Panic Deluxe Kickstarter FAQ).
+
+After the report (same session)
+-------------------------------
+- Added the scene-graph patch as the top section of ~/Documents/Claude/unicode3droadmap.md (not in any repo:
+  ~/Documents/Claude isn't under git). A fresh session will make the patch and review ENGINE_NOTES.md.
+- Committed everything to git (no remote, nothing pushed).
+- Removed the Photos folder (reference photos of the commercial game) from disk and from the repo, amending the
+  first commit so they aren't in the history either.
+- castlePanicInitialPrompt.txt: dropped the Photos reference, and corrected the asset folder name to u3dGenAss.
+- Next: playtest notes will come in a TXT file to a fresh session for the next round on Castle Panic.
