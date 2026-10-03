@@ -39,8 +39,10 @@ TOKEN_BANNER = {
     "boulder": ["A Giant Boulder!"],
     "move_red": ["Red Monsters", "move one!"], "move_green": ["Green Monsters", "move one!"],
     "move_blue": ["Blue Monsters", "move one!"], "move_cw": ["Monsters move", "clockwise!"],
-    "move_ccw": ["Monsters move", "counter-clockwise!"], "plague_archer": ["Plague!", "Archers"],
-    "plague_knight": ["Plague!", "Knights"], "plague_swordsman": ["Plague!", "Swordsmen"],
+    "move_ccw": ["Monsters move", "counter-clockwise!"],
+    "plague_archer": ["Plague! Archers", "All Archer cards", "are discarded!"],
+    "plague_knight": ["Plague! Knights", "All Knight cards", "are discarded!"],
+    "plague_swordsman": ["Plague! Swordsmen", "All Swordsman cards", "are discarded!"],
     "discard1": ["All players", "discard a card!"], "draw3": ["Draw three", "more Monsters!"],
     "draw4": ["Draw four", "more Monsters!"],
 }
@@ -164,6 +166,7 @@ class BoardScene:
         self.aspect = 2.0  # the view's width over its height, in pixels (the UI keeps it up to date)
         self.my_seat = None  # whose "Your turn" banner to show
         self.announced = False  # "the Monsters are coming" shown since the last turn began
+        self.plagued = False  # the drawn Plague! has had its sad trombone
         self.step = None  # (seat, step) of the turn as far as the animations have got
         self.turn = None  # and that turn's number
         self.selected = None
@@ -609,6 +612,12 @@ class BoardScene:
         self.rig.go_home()
         self.banner(["Missing!", "No Monsters this turn", "(whew!)"], "gilt", hold=1.6)
 
+    def _ev_discard(self, e):
+        """A card is thrown away: a Plague!'s first one this token gets the sad trombone."""
+        if e.get("why") == "plague" and not self.plagued:
+            self.plagued = True
+            self.on_sound("plague")
+
     def _ev_draw2(self, e):
         self.on_sound("card")
 
@@ -629,11 +638,13 @@ class BoardScene:
         if not self.announced:
             self._announce(e)
             return
+        self.plagued = False
         self.on_sound("token", kind=e["kind"])
 
         def after():
             self.wait = TOKEN_AFTER
-        self.banner(TOKEN_BANNER.get(e["kind"], ["A Monster!"]), "gilt", then=after, hold=TOKEN_HOLD)
+        lines = TOKEN_BANNER.get(e["kind"], ["A Monster!"])
+        self.banner(lines, "gilt", then=after, hold=TOKEN_HOLD + (0.4 if len(lines) > 2 else 0))
 
     def _ev_boss_power(self, e):
         """A Boss Monster has arrived: what its power does, in gilt lettering, before it takes effect."""

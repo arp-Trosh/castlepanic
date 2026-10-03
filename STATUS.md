@@ -24,7 +24,8 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   lines, the war horn (`start`), "tHe mOnsTeRs aRe CoMing!" in castle blocks, then the first six Monsters march
   in together. That announcement comes before the first new Monsters of every turn, and "Your turn. Defend the
   Castle!" at the start of yours. A Boss Monster announces its power in gold (`BOSS_BANNER` in scene.py)
-  as it arrives. Space/Enter/Esc hurries a banner away.
+  as it arrives, and a Plague! says which cards it takes ("Plague! Archers / All Archer cards / are
+  discarded!"). Space/Enter/Esc hurries a banner away.
 - **On the board**: ring names (Arc/Kni/Swo) on the three lines where the colours change, placed so they never
   overlap each other or a Monster's label (a line shows whole or not at all; zoomed far out, only the nearest line).
   Monster tags (GK OW TM HL TR OR GO) before the health pips (`SHOW_TAGS` in ui.py to drop them). The camera eases
@@ -42,8 +43,9 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
   shows only the frame rate (achieved/target, clickable).
 - **unicode3d v0.11.0** (camera parents, `DisplayControls(show=...)`, block lettering), pinned in requirements.txt.
-- **Sound** (`sound.py`): 33 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
-  aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all.
+- **Sound** (`sound.py`): 35 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
+  aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all. A Plague! that takes cards
+  plays a sad trombone ("wah wah wahhh", `plague`) with its first discard.
 - **Assets**: 21 models by Blender scripts in `assets/src/` (kit + STYLE.md), exported to `castlepanic/data/models/`.
   Tools: `tools/preview.py` (terminal-accurate contact sheets), `tools/scene_game.py` (bot game through the scene,
   off-screen), `tools/ui_test.py` (scripted UI run with screenshots).

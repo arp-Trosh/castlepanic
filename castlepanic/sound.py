@@ -16,7 +16,7 @@ import numpy as np
 from numba import njit
 
 RATE = 22050
-VERSION = 5  # (bump when a sound changes: they are made once and cached)
+VERSION = 6  # (bump when a sound changes: they are made once and cached)
 
 
 def _t(dur):
@@ -249,6 +249,25 @@ def make_sounds():
         return (np.sin(2 * np.pi * f * t) + 0.25 * np.sin(2 * np.pi * f * 2.76 * t) * np.exp(-t * 18)) * \
             np.exp(-t * 7) * _env(len(t), 0.004, 0.05)
     S["chat"] = _norm(_mix((bell(880, 0.5), 0), (bell(1319, 0.6), 0.11)), 0.3)
+    # a Plague! takes cards: the sad trombone, "wah wah wahhh", three notes sliding down a semitone each, every one
+    # a brass buzz through a plunger mute, the mouth's formants sliding "oo" to "ah" and back; the last note held,
+    # sagging, wobbling and dying away
+    def wah(f, d, sag=0.0):
+        t = _t(d)
+        u = t / d
+        wobble = 0.03 * np.clip((t - 0.25) / 0.4, 0, 1) * np.sin(2 * np.pi * 6 * t)
+        pitch = f * (1 - 0.03 * np.exp(-t * 25)) * (1 - sag * u) * (1 + wobble)
+        x = _saw(pitch, d) + 0.4 * _saw(pitch * 1.004, d)
+        if d < 0.6:
+            mouth = np.sin(np.pi * np.clip(t / (d * 0.9), 0, 1)) ** 0.7
+            level = 1.0
+        else:
+            mouth = np.clip(t / 0.15, 0, 1) * (1 - 0.6 * u) * (1 + 0.4 * np.sin(2 * np.pi * 6 * t) * u)
+            level = 1 - 0.7 * u
+        y = _bandpass(x, 330 + 420 * mouth, 4) + 0.6 * _bandpass(x, 750 + 450 * mouth, 5) + \
+            0.15 * _bandpass(x, 2400, 6) * mouth
+        return y * level * _env(len(t), 0.03, min(0.15, d * 0.4))
+    S["plague"] = _norm(_mix((wah(233, 0.42), 0), (wah(220, 0.42), 0.45), (wah(208, 1.5, 0.05), 0.9)), 0.6)
     S["spawn"] = S["growl_orc"]
     S["hit"] = S["arrow_hit"]
     return S
