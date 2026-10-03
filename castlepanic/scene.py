@@ -17,6 +17,7 @@ from unicode3d.transforms import quat_axis_angle
 
 from . import board
 from .actors import Actor, Library, Static
+from .banner import Banner
 from .fx import Effects
 from .rules import ARCS, CASTLE, FOREST, SWORDSMAN, KNIGHT, ARCHER, arc_color
 
@@ -27,6 +28,8 @@ DEFENDER_FOR = {"archer": "archer", "knight": "knight", "swordsman": "swordsman"
                 "barbarian": "barbarian"}
 BANNER_RGB = {"red": (170, 30, 24), "green": (40, 120, 40), "blue": (40, 70, 170)}
 TAR = blob_mesh((0.5, 0.06, 0.5))
+SPAWN_AFTER = 0.5  # seconds after "tHe mOnsTeRs aRe CoMing!" that they appear
+HOME_AFTER = 1.0  # seconds after the action ends that the camera eases back to the whole-board view
 
 
 class CameraRig:
@@ -131,6 +134,12 @@ class BoardScene:
             Light(direction=np.array([0.6, -0.35, 0.55]), ambient=0.0, diffuse=0.45, color=(130, 150, 255)),
         ]
         self.highlight = set()  # mids to mark as targets
+        self.quiet = 0.0  # seconds since the last animation ended (the camera goes home after HOME_AFTER)
+        self.homed = True
+        self.banners = []  # lettering on screen (banner.Banner)
+        self.aspect = 2.0  # the view's width over its height, in pixels (the UI keeps it up to date)
+        self.my_seat = None  # whose "Your turn" banner to show
+        self.announced = False  # "the Monsters are coming" shown since the last turn began
         self.selected = None
 
     def _static(self, name, p, y, scale=1.0):
@@ -163,6 +172,8 @@ class BoardScene:
                 out += a.objects()
         out += list(self.tars.values())
         out += self.fx.objects()
+        for b in self.banners:
+            out += b.objects()
         return out
 
     def monster_at_cell(self, renderer, x, y):
@@ -177,24 +188,27 @@ class BoardScene:
 
     # -------------------------------------------------------------------------------------------------- state
 
-    def sync(self, game):
-        """Make the scene match the game at once, no animation."""
+    def sync(self, game, without=()):
+        """Make the scene match the game at once, no animation (bar the Monsters `without`, still to come)."""
         for arc in range(ARCS):
             self._set_static(self.towers[arc], game.towers[arc], "Collapse")
             self._set_static(self.walls[arc], game.walls[arc], "Collapse")
             if self.forts[arc]:
                 self.forts[arc].visible = bool(game.fortified[arc])
-        live = set(game.monsters)
+        live = set(game.monsters) - set(without)
         for mid in list(self.monsters):
             if mid not in live:
                 self._remove_monster(mid)
         for mid, m in game.monsters.items():
+            if mid not in live:
+                continue
             if mid not in self.monsters:
                 self._add_monster(m)
             self.mdata[mid] = dict(m)
         self._layout(animate=False)
         for mid, m in game.monsters.items():
-            self._set_tar(mid, m["tar"])
+            if mid in live:
+                self._set_tar(mid, m["tar"])
         self._sentries(game)
 
     def _set_static(self, s, intact, clip):
@@ -213,8 +227,8 @@ class BoardScene:
             want = game.walls[arc]
             have = self.sentries[arc]
             if want and have is None and self.lib.has(kinds[arc]):
-                p, y, _ = board.wall_position(arc)
-                self.sentries[arc] = Actor(self.lib, kinds[arc], p + (0, 1.0, 0), y + math.pi,
+                p, y, _ = board.wall_position(arc)  # y faces out of the castle, to the oncoming Monsters
+                self.sentries[arc] = Actor(self.lib, kinds[arc], p + (0, 1.0, 0), y,
                                            scale=DEFENDER_SCALE * 0.8, rng=self.rng)
             elif not want and have is not None:
                 self.sentries[arc] = None
@@ -300,11 +314,24 @@ class BoardScene:
             if a:
                 t.position = a.position + (0, 0.02, 0)
         self.fx.update(dt)
+        for b in self.banners:
+            b.update(dt, self.rig.camera, self.aspect)
+        for b in [b for b in self.banners if b.done]:
+            self.banners.remove(b)
+            b.then()
         if self.wait > 0:
             self.wait -= dt
-            return
-        while self.queue and self.pending == 0 and self.wait <= 0:
-            self._step(self.queue.pop(0))
+        else:
+            while self.queue and self.pending == 0 and self.wait <= 0:
+                self._step(self.queue.pop(0))
+        # once things have been still a moment, back to the whole board (unless the player is steering)
+        if self.busy():
+            self.quiet, self.homed = 0.0, False
+        else:
+            self.quiet += dt
+            if self.quiet >= HOME_AFTER and not self.homed:
+                self.homed = True
+                self.rig.go_home()
 
     def _monster_point(self, mid, up=0.6):
         a = self.monsters.get(mid)
@@ -316,11 +343,61 @@ class BoardScene:
         if h:
             h(e)
 
+    # ---- banners
+    def banner(self, lines, style="gilt", then=None, hold=None):
+        """Put lettering up; the event queue waits until it has gone, then then() is called."""
+        def start(done):
+            b = Banner(lines, style, hold)
+            b.then = lambda: (then and then(), done())
+            self.banners.append(b)
+        self._wait_for(start)
+
+    def skip_banners(self):
+        for b in self.banners:
+            b.skip()
+
+    def _ev_banner(self, e):
+        self.banner(e["lines"], e.get("style", "gilt"), hold=e.get("hold"))
+
+    def _ev_sound(self, e):
+        self.on_sound(e["name"])
+        self.wait = e.get("wait", 0.0)
+
+    def _announce(self, e):
+        """Before the first new Monsters of a turn: "tHe mOnsTeRs aRe CoMing!", then (SPAWN_AFTER on) event e."""
+        self.announced = True
+        self.queue.insert(0, e)
+        self.rig.go_home()
+
+        def after():
+            self.wait = SPAWN_AFTER
+        self.banner(["tHe mOnsTeRs", "aRe CoMing!"], "stone", then=after)
+
     # ---- turns and cards
     def _ev_turn(self, e):
         self.on_sound("turn")
         self.rig.go_home()
         self.wait = 0.3
+        self.announced = False
+        if self.my_seat is not None and e.get("seat") == self.my_seat:
+            self.banner(["Your turn.", "Defend the Castle!"], "stone")
+
+    def _ev_wave(self, e):
+        """The first Monsters march in together from the forest edge to their places."""
+        if not self.announced:
+            self._announce(e)
+            return
+        mids = set()
+        for s in e["spawns"]:
+            m = {"id": s["mid"], "kind": s["kind"], "arc": s["arc"], "ring": s["ring"], "hp": s["hp"],
+                 "max": s["hp"], "tar": False}
+            a = self._add_monster(m, at=board.polar(board.arc_angle(s["arc"]), 11.5))
+            mids.add(s["mid"])
+            if a.has("Roar"):
+                self._after(self.rng.uniform(1.2, 2.2), lambda a=a: a.play("Roar"))
+        self.on_sound("march")
+        self._after(0.6, lambda: self.on_sound("spawn", kind="orc"))
+        self._layout(only=mids, duration=2.2)
 
     def _ev_attack(self, e):
         mid = e["mid"]
@@ -506,6 +583,9 @@ class BoardScene:
 
     def _ev_spawn(self, e):
         if e["mid"] in self.monsters:
+            return
+        if e["ring"] == FOREST and not self.announced:
+            self._announce(e)
             return
         m = {"id": e["mid"], "kind": e["kind"], "arc": e["arc"], "ring": e["ring"], "hp": e["hp"], "max": e["hp"],
              "tar": False}

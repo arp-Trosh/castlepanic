@@ -37,7 +37,11 @@ def main():
             ok = app.frame(screen, 1 / 30, keys if i == 0 else [])
             assert ok is not False
     run(5, []); shot(screen, "assets/previews/ui_menu.png")
-    run(1, [Key.ENTER]); run(90, [])
+    run(1, [Key.ENTER]); run(60, [])
+    shot(screen, "assets/previews/ui_intro.png")
+    while app.scene.busy():  # the opening: words, horn, the first wave
+        run(1, [])
+    run(30, [])
     shot(screen, "assets/previews/ui_game0.png")
     g = app.session.game
     # try to play the first playable hit card on its first target

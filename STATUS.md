@@ -1,4 +1,4 @@
-# Status (2026-10-02)
+# Status (2026-10-03)
 
 Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host / join -> game -> game over).
 
@@ -17,7 +17,18 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
 - **UI** (`ui.py`): menu over a live board, lobby with seats/bots/chat, game screen (status, 3D view, players with
   open hands, log, hand as card boxes, prompts, letter/click targeting, wall numbers, trade flow, help overlay H).
 - **Network** (`session.py`, `net.py`): host/join, port 5555, lobby, bots fill seats, chat strip, a leaver becomes a bot.
-- **Sound** (`sound.py`): 32 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
+- **Banners** (`banner.py`, `fonts.py`): 3D lettering in front of the camera. A new siege opens with three gold
+  lines, the war horn (`start`), "tHe mOnsTeRs aRe CoMing!" in castle blocks, then the first six Monsters march
+  in together. That announcement comes before the first new Monsters of every turn, and "Your turn. Defend the
+  Castle!" at the start of yours. Space/Enter/Esc hurries a banner away.
+- **On the board**: ring names (Arc/Kni/Swo) on the three lines where the colours change, placed so they never
+  overlap each other or a Monster's label (a line shows whole or not at all; zoomed far out, only the nearest line).
+  Monster tags (GK OW TM HL TR OR GO) before the health pips (`SHOW_TAGS` in ui.py to drop them). The camera eases
+  back to the whole board 1 s after the action ends. An END TURN button in the side panel.
+- **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections on the menu's Settings
+  screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
+  shows only the frame rate.
+- **Sound** (`sound.py`): 33 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all.
 - **Assets**: 21 models by Blender scripts in `assets/src/` (kit + STYLE.md), exported to `castlepanic/data/models/`.
   Tools: `tools/preview.py` (terminal-accurate contact sheets), `tools/scene_game.py` (bot game through the scene,

@@ -11,7 +11,10 @@ Everything works by keyboard and most things by mouse too. The game screen:
     +------------------------------------------+----------------+
     | your hand: card boxes, what to do next                     |
     | (multiplayer) chat                                          |
-    | keys help                                 display controls  |
+    | keys help                                         frame rate |
+
+The display settings (glyphs, colours, frame rate, shadows, reflections) are on the menu's Settings screen, kept
+between runs (settings.py); F2-F6 still switch them anywhere.
 """
 import math
 import time
@@ -23,10 +26,11 @@ from unicode3d.scene import Renderer
 from unicode3d.terminal import Color
 from unicode3d.ui import DisplayControls
 
-from . import board
+from . import board, settings
 from .narrate import describe
 from .net import DEFAULT_PORT, local_ip
-from .rules import (ARCS, CARD_HELP, CASTLE, FOREST, HIT_RING, RING_NAMES, IllegalMove, arc_color, card_title)
+from .rules import (ARCHER, ARCS, CARD_HELP, CASTLE, FOREST, HIT_RING, KNIGHT, RING_NAMES, SWORDSMAN, IllegalMove,
+                    arc_color, card_title)
 from .scene import BoardScene
 from .session import MAX_NAME, ClientSession, HostSession, single_player
 from .sound import Sound
@@ -39,7 +43,23 @@ PHASE_TEXT = {"discard": "Discard & draw (optional)", "trade": "Trade (optional)
               "monsters": "Monsters move", "over": "Game over"}
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 HP_PIP = "●"
+FPS_WIDTH = len("999 fps")
+RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
+RING_LABELS_FAR = 26.0  # camera distance beyond which only one line of ring names shows
+# a short tag over each Monster, so it's known at a glance (set SHOW_TAGS False to drop them)
+SHOW_TAGS = True
+MONSTER_TAG = {"goblin_king": "GK", "orc_warlord": "OW", "troll_mage": "TM", "healer": "HL", "troll": "TR",
+               "orc": "OR", "goblin": "GO"}
 
+
+# the start of a siege: these words, the war horn, then "tHe mOnsTeRs aRe CoMing!" and the first wave
+INTRO = [
+    {"e": "banner", "lines": ["We're being attacked", "by monsters!"], "style": "gilt"},
+    {"e": "banner", "lines": ["Defend the castle!"], "style": "gilt", "hold": 1.2},
+    {"e": "banner", "lines": ["Fight! Fight!", "Never surrender!"], "style": "gilt"},
+    {"e": "sound", "name": "start", "wait": 1.8},
+]
+SKIP_KEYS = (Key.ESC, Key.ENTER, ord(" "))  # hurry the lettering away
 
 HELP = [
     "HOW TO PLAY",
@@ -87,7 +107,8 @@ class TextInput:
 
 
 class App:
-    def __init__(self, name, sound=True, seed=None, fps=30):
+    def __init__(self, name, sound=True, seed=None, fixed=()):
+        """fixed: the display settings given on the command line, which win over the saved ones this run."""
         self.name = name[:MAX_NAME]
         self.sound = Sound(sound)
         self.seed = seed
@@ -96,7 +117,10 @@ class App:
         self.session = None
         self.scene = BoardScene(seed=seed or 1, on_sound=self.sound.play)
         self.renderer = Renderer(1, 1)
-        self.controls = DisplayControls(renderer=self.renderer)
+        self.controls = DisplayControls(renderer=self.renderer)  # not drawn: their keys, and the Settings screen
+        self.saved = settings.load()
+        self.fixed = set(fixed)
+        self.settings_index = 0
         self.form = {"players": 1, "host_players": 4, "port": TextInput(str(DEFAULT_PORT), 5),
                      "address": TextInput("127.0.0.1", 60), "name": TextInput(self.name, MAX_NAME), "bots": True,
                      "field": 0}
@@ -107,6 +131,7 @@ class App:
         self.quit_armed = 0.0
         self.view = (0, 0, 1, 1)  # top, left, width, height of the 3D view
         self.hand_boxes = []  # (x0, y0, x1, y1, card id)
+        self.end_box = (-1, -1, -1, -1)  # the End Turn button: x0, y0, x1, y1
         self.click_zones = []  # (x0, y0, x1, y1, callback)
         self._demo()
         self.last_sync = 0.0
@@ -137,7 +162,13 @@ class App:
         dt = min(dt, 0.1)
         self.message_t = max(0.0, self.message_t - dt)
         self.quit_armed = max(0.0, self.quit_armed - dt)
+        first = self.controls.screen is None
         keys = self.controls.handle(keys, screen)
+        if first:
+            self._apply_settings()
+        elif self._settings() != self.saved:
+            self.saved = self._settings()
+            settings.save(self.saved)
         rows, cols = screen.size()
         screen.erase()
         if rows < 20 or cols < 70:
@@ -146,7 +177,8 @@ class App:
             return not any(k in (ord("q"), Key.ESC) for k in keys)
         handler = getattr(self, "frame_" + self.mode)
         result = handler(screen, dt, keys, rows, cols)
-        self.controls.draw(screen, rows - 1, cols - self.controls.width - 1)
+        fps = f"{min(screen.measured_fps or 0, 999):.0f} fps"
+        screen.text(rows - 1, cols - len(fps) - 1, fps, Color.WHITE, dim=True)
         screen.refresh()
         return result is not False
 
@@ -187,21 +219,45 @@ class App:
                 return True
         return False
 
+    def _setting_widgets(self):
+        """(key, title, widget, shown) for each display setting, in the Settings screen's order."""
+        c = self.controls
+        return [("glyphs", "Characters", c.glyphs, str), ("color", "Colours", c.color, str),
+                ("fps", "Frame rate", c.fps, lambda v: f"{v} fps"),
+                ("shadows", "Shadows", c.shadows, lambda v: "on" if v else "off"),
+                ("reflections", "Reflections", c.reflections, lambda v: "on" if v else "off")]
+
+    def _settings(self):
+        return {key: w.value for key, _, w, _ in self._setting_widgets()}
+
+    def _apply_settings(self):
+        """Put the saved settings into effect (bar those given on the command line); then remember them all."""
+        for key, _, w, _ in self._setting_widgets():
+            if key in self.saved and key not in self.fixed and self.saved[key] in w.options:
+                try:
+                    w.value = self.saved[key]
+                except ValueError:  # e.g. sextant glyphs saved, but this terminal lacks Unicode
+                    pass
+        self.saved = self._settings()
+
     # ---------------------------------------------------------------------------------------------- menu
 
-    MENU = ["Single Player", "Host Game", "Join Game", "Name", "Quit"]
+    MENU = ["Single Player", "Host Game", "Join Game", "Name", "Settings", "Quit"]
 
-    def frame_menu(self, screen, dt, keys, rows, cols):
+    def _backdrop(self, screen, dt, rows, cols, sub="Defend the last towers against the horde"):
+        """The menu screens' background: the demo board, the camera circling; the title over it."""
         self.scene.rig.yaw += dt * 0.08
         self.scene.rig.pitch = math.radians(38)
         self.scene.rig.dist = 19
         self.scene.update(dt)
         self._draw_view(screen, 0, 0, cols, rows - 1)
-        f = self.form
         title = "C A S T L E   P A N I C"
         screen.text(2, (cols - len(title)) // 2, title, Color.YELLOW, bold=True)
-        sub = "Defend the last towers against the horde"
         screen.text(3, (cols - len(sub)) // 2, sub, Color.WHITE, dim=True)
+
+    def frame_menu(self, screen, dt, keys, rows, cols):
+        self._backdrop(screen, dt, rows, cols)
+        f = self.form
         x0 = cols // 2 - 18
         y0 = 6
         items = [
@@ -209,6 +265,7 @@ class App:
             f"Host Game       < {f['host_players']} seats, bots {'on' if f['bots'] else 'off'}, port {f['port'].value} >",
             f"Join Game       [{f['address'].value}]",
             f"Name            [{f['name'].value}]",
+            "Settings",
             "Quit",
         ]
         self.click_zones = []
@@ -220,7 +277,7 @@ class App:
         help_ = "Up/Down choose  Left/Right change  Enter select  type to edit  Q quit"
         if self.menu_index == 1:
             help_ = "Left/Right seats  B bots  P port  Enter host  (port: type digits after P)"
-        screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
+        screen.text(rows - 1, 1, help_[:cols - FPS_WIDTH - 3], Color.WHITE, dim=True)
         if self.message_t > 0:
             screen.text(y0 + 12, x0 - 2, self.message, Color.RED, bold=True)
         editing = {2: f["address"], 3: f["name"]}.get(self.menu_index)
@@ -280,10 +337,55 @@ class App:
                 self.session = ClientSession(self.name, host or "127.0.0.1", int(port or DEFAULT_PORT))
                 self.mode = "lobby"
             elif i == 4:
+                self.mode = "settings"
+                self.settings_index = 0
+            elif i == 5:
                 return False
         except (OSError, ValueError) as e:
             self.flash(f"Couldn't: {e}")
             self.session = None
+        return True
+
+    # ---------------------------------------------------------------------------------------------- settings
+
+    def frame_settings(self, screen, dt, keys, rows, cols):
+        self._backdrop(screen, dt, rows, cols, "Settings")
+        widgets = self._setting_widgets()
+        x0, y0 = cols // 2 - 18, 6
+        self.click_zones = []
+        for i, (_, title, w, shown) in enumerate(widgets + [(None, "Back", None, None)]):
+            sel = i == self.settings_index
+            text = f"{title:<15} < {shown(w.value)} >" if w else title
+            screen.text(y0 + 2 * i, x0 - 2, ("> " if sel else "  ") + text, Color.YELLOW if sel else Color.WHITE,
+                        bold=sel)
+            self.click_zones.append((x0 - 2, y0 + 2 * i, x0 + 40, y0 + 2 * i, i))
+        help_ = "Up/Down choose  Left/Right change  Esc back  (kept for next time)"
+        screen.text(rows - 1, 1, help_[:cols - FPS_WIDTH - 3], Color.WHITE, dim=True)
+        n = len(widgets) + 1
+        for k in keys:
+            step = 0
+            if isinstance(k, MouseEvent):
+                if k.pressed and k.button in (MouseEvent.LEFT, MouseEvent.RIGHT):
+                    for x0_, y0_, x1, y1, i in self.click_zones:
+                        if y0_ == k.y and x0_ <= k.x <= x1:
+                            self.settings_index = i
+                            step = 1 if k.button == MouseEvent.LEFT else -1
+                if not step:
+                    continue
+            elif k == Key.UP:
+                self.settings_index = (self.settings_index - 1) % n
+            elif k in (Key.DOWN, Key.TAB):
+                self.settings_index = (self.settings_index + 1) % n
+            elif k in (Key.LEFT, Key.RIGHT, Key.ENTER, ord(" ")):
+                step = -1 if k == Key.LEFT else 1
+            elif k in (Key.ESC, ord("q"), ord("Q")):
+                self.mode = "menu"
+                return True
+            if step:
+                if self.settings_index == n - 1:
+                    self.mode = "menu"
+                    return True
+                widgets[self.settings_index][2].step(step)
         return True
 
     # ---------------------------------------------------------------------------------------------- lobby
@@ -387,28 +489,46 @@ class App:
 
     # ---------------------------------------------------------------------------------------------- game
 
-    def _begin_game(self, events):
-        s = self.session
+    def _new_scene(self):
         self.scene = BoardScene(seed=self.seed or 2, on_sound=self.sound.play)
-        if s.is_host:
-            s.scene_busy = self.scene.busy
+        self.scene.my_seat = self.session.my_seat
+        if self.session.is_host:
+            self.session.scene_busy = self.scene.busy
+
+    def _begin_game(self, events):
+        s, g = self.session, self.session.game
+        self._new_scene()
         self.mode = "game"
         self.ui = {"mode": None}
         self.log = []
-        if s.game:
-            self.scene.sync(s.game)
-        self._feed([e for e in events if e.get("e") != "_sync"])
+        events = [e for e in events if e.get("e") != "_sync"]
+        if not (g and g.turn == 1 and g.phase == "discard"):  # (not a fresh game: just catch up)
+            if g:
+                self.scene.sync(g)
+            self._feed(events)
+            return
+        # a fresh siege: an empty board, the opening words, the horn, then the first Monsters march in
+        self.scene.sync(g, without=g.monsters)
+        self._narrate(events)
+        wave = [{"e": "spawn", "mid": mid, "kind": m["kind"], "arc": m["arc"], "ring": m["ring"], "hp": m["hp"]}
+                for mid, m in sorted(g.monsters.items())]
+        rest = [e for e in events if e.get("e") != "spawn"]
+        if not any(e.get("e") == "turn" for e in rest):  # (a client is sent the state, not the opening events)
+            rest.append({"e": "turn", "seat": g.current, "turn": g.turn})
+        self.scene.play(INTRO + [{"e": "wave", "spawns": wave}] + rest)
 
-    def _feed(self, events):
+    def _narrate(self, events):
         s = self.session
         for e in events:
-            if e.get("e") == "_sync":
-                self.scene = BoardScene(seed=self.seed or 2, on_sound=self.sound.play)
-                self.scene.sync(s.game)
-                continue
-            text = describe(e, s.game, s.names)
+            text = describe(e, s.game, s.names) if e.get("e") != "_sync" else None
             if text:
                 s.say(text, "game")
+
+    def _feed(self, events):
+        if any(e.get("e") == "_sync" for e in events):
+            self._new_scene()
+            self.scene.sync(self.session.game)
+        self._narrate(events)
         self.scene.play([e for e in events if e.get("e") != "_sync"])
 
     def frame_game(self, screen, dt, keys, rows, cols):
@@ -431,8 +551,10 @@ class App:
         chat_h = 6 if s.networked else 0
         view_h = rows - 1 - hand_h - chat_h - 1
         view_w = cols - side
+        self.scene.aspect = view_w * self.renderer.cell_aspect / max(view_h, 1)
         self._draw_view(screen, 1, 0, view_w, view_h)
-        self._labels(screen)
+        if not self.scene.banners:
+            self._labels(screen)
         self._status(screen, cols)
         self._side(screen, 1, view_w, side, view_h + hand_h)
         self._hand(screen, 1 + view_h, 0, view_w, hand_h)
@@ -441,7 +563,7 @@ class App:
         help_ = "1-9 card  X discard  T trade  E end turn  arrows/+/- camera  R view  H help  M sound  Q quit"
         if s.networked:
             help_ += "  Tab chat"
-        screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
+        screen.text(rows - 1, 1, help_[:cols - FPS_WIDTH - 3], Color.WHITE, dim=True)
         self._popups(screen, rows, cols)
         if self.ui.get("help"):
             self._help(screen, rows, cols)
@@ -450,6 +572,9 @@ class App:
                 continue
             if k in (ord("h"), ord("H"), Key.F1) or (self.ui.get("help") and k == Key.ESC):
                 self.ui["help"] = not self.ui.get("help")
+                continue
+            if self.scene.banners and k in SKIP_KEYS:
+                self.scene.skip_banners()
                 continue
             if isinstance(k, MouseEvent):
                 self._mouse(k)
@@ -472,22 +597,52 @@ class App:
         right = f"Towers {towers}  Walls {sum(g.walls)}/6  Monsters left {len(g.pile)}  Deck {len(g.deck)} "
         screen.text(0, cols - len(right), right, Color.WHITE, reverse=True)
 
+    def _spot(self, point, text, owner=None, hide=True):
+        """Where (row, column) a label for a world point would start on screen; None if hidden or off the view."""
+        top, left, w, h = self.view
+        anchor = self.renderer.anchor(point, owner)
+        if anchor is None or (hide and anchor.hidden):
+            return None
+        x, y = left + anchor.x - len(text) // 2, top + anchor.y
+        return None if x < left or x + len(text) > left + w else (y, x)
+
+    @staticmethod
+    def _free(used, spot, text, pad=1, rows=0):
+        """Whether a label at spot keeps pad columns (and rows rows) clear of those already put (used: row -> spans)."""
+        y, x = spot
+        return not any(x - pad < b and a < x + len(text) + pad
+                       for yy in range(y - rows, y + rows + 1) for a, b in used.get(yy, ()))
+
+    def _put(self, screen, used, spot, text, color, bold=False):
+        y, x = spot
+        used.setdefault(y, []).append((x, x + len(text)))
+        screen.text(y, x, text, color, bold=bold)
+
     def _labels(self, screen):
-        """Health pips over every Monster; target letters while choosing; wall numbers while choosing a wall."""
+        """Health pips over every Monster; target letters while choosing; wall numbers while choosing a wall;
+        ring names along the lines where the colours change; arc numbers round the forest edge. Monsters' labels
+        come first; the board's give way to them and to each other."""
         top, left, w, h = self.view
         ui = self.ui
         letters = ui.get("letters", {})
+        used = {}
         for mid, a in self.scene.monsters.items():
             m = self.scene.mdata.get(mid)
             if not m or a.dead:
                 continue
             pips = HP_PIP * m["hp"] + "○" * (m["max"] - m["hp"]) if screen.unicode else "o" * m["hp"]
             tag = f"[{letters[mid]}]" if mid in letters else ""
+            if SHOW_TAGS:
+                tag += MONSTER_TAG.get(m["kind"], "") + " "
             color = Color.YELLOW if mid in letters else (Color.RED if m["ring"] <= 1 else Color.WHITE)
             if m.get("tar"):
                 tag += "~"
-            screen.label(self.renderer, a.top(), tag + pips, color, top=top, left=left, owner=a.model, hide=False,
-                         bold=bool(tag))
+            text = tag + pips
+            anchor = screen.label(self.renderer, a.top(), text, color, top=top, left=left, owner=a.model, hide=False,
+                                  bold=mid in letters)
+            if anchor:
+                x = left + anchor.x - len(text) // 2
+                used.setdefault(top + anchor.y, []).append((x, x + len(text)))
         if ui.get("mode") == "wall":
             for arc in ui.get("arcs", []):
                 p, _, _ = board.wall_position(arc)
@@ -497,7 +652,31 @@ class App:
         for arc in range(ARCS):
             p = board.polar(board.arc_angle(arc), 9.0, 0.1)
             col = {"red": Color.RED, "green": Color.GREEN, "blue": Color.BLUE}[arc_color(arc)]
-            screen.label(self.renderer, p, str(arc + 1), col, top=top, left=left, hide=True, bold=True)
+            spot = self._spot(p, str(arc + 1), self.scene.ground)
+            if spot and self._free(used, spot, str(arc + 1), pad=0):
+                self._put(screen, used, spot, str(arc + 1), col, bold=True)
+        # ring names on the lines between the colours, nearest the camera first; a line's names show all together
+        # (those not hidden behind something) or not at all, so a half-labelled line never misleads; zoomed far out,
+        # only the nearest line's, as the rings are too thin on screen for more
+        eye = self.scene.rig.camera.position
+        lines = sorted((0, 2, 4), key=lambda arc: np.linalg.norm(board.polar(board.arc_angle(arc, 0.0), 5.0) - eye))
+        if self.scene.rig.dist > RING_LABELS_FAR:
+            lines = lines[:1]
+        for arc in lines:
+            names = []
+            for ring in (ARCHER, KNIGHT, SWORDSMAN):
+                p = board.polar(board.arc_angle(arc, 0.0), board.ring_mid(ring), 0.1)
+                spot = self._spot(p, RING_LABEL[ring], self.scene.ground)
+                if spot:
+                    names.append((spot, RING_LABEL[ring]))
+            line = {}  # this line's names so far, which mustn't crowd each other either
+            fits = True
+            for sp, t in names:
+                fits = fits and self._free(used, sp, t, rows=1) and self._free(line, sp, t, rows=1)
+                line.setdefault(sp[0], []).append((sp[1], sp[1] + len(t)))
+            if fits:
+                for sp, t in names:
+                    self._put(screen, used, sp, t, Color.WHITE)
 
     def _side(self, screen, top, x, width, height):
         s, g = self.session, self.session.game
@@ -505,6 +684,8 @@ class App:
             screen.text(yy, x, "│" if screen.unicode else "|", Color.WHITE, dim=True)
         x += 2
         width -= 3
+        self._end_button(screen, top + height - 3, x, width)
+        height -= 4
         y = top
         screen.text(y, x, "Defenders", Color.CYAN, bold=True)
         y += 1
@@ -553,6 +734,22 @@ class App:
                     col = Color.MAGENTA
                 screen.text(y, x, t, col)
                 y += 1
+
+    def _end_button(self, screen, top, x, width):
+        """A button to end the turn (as E does), lit while that's yours to do."""
+        s, g = self.session, self.session.game
+        live = g.current == s.my_seat and g.phase in ("discard", "trade", "play") and not self.scene.busy()
+        w = min(width, 24)
+        x += (width - w) // 2
+        tl, tr, bl, br, hz, vt = "╭╮╰╯─│" if screen.unicode else "++++-|"
+        label = "END TURN".center(w - 2)
+        col = Color.YELLOW if live else Color.WHITE
+        screen.text(top, x, tl + hz * (w - 2) + tr, col, dim=not live)
+        screen.text(top + 1, x, vt, col, dim=not live)
+        screen.text(top + 1, x + 1, label, col, bold=live, dim=not live, reverse=live)
+        screen.text(top + 1, x + w - 1, vt, col, dim=not live)
+        screen.text(top + 2, x, bl + hz * (w - 2) + br, col, dim=not live)
+        self.end_box = (x, top, x + w - 1, top + 2)
 
     def _hand(self, screen, top, left, width, height):
         s, g = self.session, self.session.game
@@ -675,6 +872,11 @@ class App:
         if self._mouse_view(ev):
             return
         if not (ev.pressed and ev.button == MouseEvent.LEFT) or ev.moved:
+            return
+        x0, y0, x1, y1 = self.end_box
+        if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
+            if self.session.game.current == self.session.my_seat:
+                self._key(ord("e"))
             return
         for x0, y0, x1, y1, cid in self.hand_boxes:
             if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:

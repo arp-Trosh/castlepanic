@@ -16,7 +16,7 @@ import numpy as np
 from numba import njit
 
 RATE = 22050
-VERSION = 2
+VERSION = 3
 
 
 def _t(dur):
@@ -228,6 +228,10 @@ def make_sounds():
     S["card"] = _norm(_bandpass(_noise(rng, 0.07), 5000, 1.5) * _env(int(0.07 * RATE), 0.002, 0.06), 0.4)
     t = _t(0.6)
     S["missing"] = _norm(_sine(1400 - 900 * t / 0.6, 0.6) * _env(len(t), 0.02, 0.2), 0.4)
+    # the siege begins: a long horn call over a rolling war drum
+    call = horn([(147, 0.3), (147, 0.18), (196, 0.3), (220, 0.3), (294, 1.4)], 2.4)
+    roll = [(drum(0.4, 60 if k % 4 else 50), 0.25 * k) for k in range(12)]
+    S["start"] = _norm(_mix((call, 0.1), *roll, (drum(0.9, 45) * 1.4, 3.0)), 0.8)
     S["spawn"] = S["growl_orc"]
     S["hit"] = S["arrow_hit"]
     return S

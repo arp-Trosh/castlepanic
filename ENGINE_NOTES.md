@@ -23,3 +23,13 @@
   15 monsters cost 50 ms/frame. Passing one cache dict through `union_bounds`, or caching per frame, would fix it.
 - **Screen text is ANSI-8 only**: `Screen.text` takes the 8 named colours, with no background colour and no
   truecolor. Card-style UIs (coloured card faces, a highlighted selection) can only use reverse/bold/dim.
+- **No fonts for `text_mesh`.** It takes a bitmap font, but the only one is the 5-row partial `FONT` in
+  `examples/room.py`. Banner lettering (castlepanic/fonts.py) needed two full alphabets drawn by hand. A built-in
+  font (A-Z, a-z, digits, punctuation) would help, and so would a per-pixel option (each pixel its own block, for
+  stone or brick lettering) next to the merged-runs extrusion.
+- **No camera-space placement.** Putting lettering in front of the camera meant building the right/up/forward
+  basis from `position`/`target` and calling `quat_from_matrix` (banner.py). A `Camera.basis()`, or letting an
+  Object3D take the camera as `parent`, would make HUD-style 3D objects easy.
+- **`DisplayControls` is all or nothing.** The game wanted only the frame rate on screen and the rest on a settings
+  page, so it keeps an undrawn `DisplayControls` for the widgets and F-keys and writes the fps itself. An fps-only
+  readout widget and a load/save of display settings (they are the same for every game) would be welcome.
