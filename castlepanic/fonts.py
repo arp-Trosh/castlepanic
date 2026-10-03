@@ -5,22 +5,10 @@ gold lettering of the opening lines.
 BLOCK: square capitals 7 rows tall, each pixel a stone block; lower case are the same letters as small capitals,
 5 rows tall on the same baseline, so "tHe mOnsTeRs" jumps up and down like a battlement.
 
-Each font is {character: rows of "#" (ink) and "." (blank)}, every glyph the font's full height.
+Each font is {character: rows of "#" (ink) and "." (blank)}, every glyph the font's full height (unicode3d's
+fonts.font() builds them from "/"-separated rows).
 """
-
-
-def _font(height, glyphs, top=0):
-    """Glyphs given as "/"-separated rows, placed from row `top` (a glyph's own top if it is a tuple (top, rows))
-    and padded with blank rows to `height`."""
-    out = {}
-    for ch, spec in glyphs.items():
-        at, spec = spec if isinstance(spec, tuple) else (top, spec)
-        rows = spec.split("/")
-        w = len(rows[0])
-        assert all(len(r) == w for r in rows), ch
-        out[ch] = ["." * w] * at + rows + ["." * w] * (height - at - len(rows))
-        assert len(out[ch]) == height, ch
-    return out
+from unicode3d.fonts import font as _font
 
 
 _GILT_CAPS = {

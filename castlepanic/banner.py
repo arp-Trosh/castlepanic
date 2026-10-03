@@ -15,8 +15,8 @@ import random
 import numpy as np
 
 from unicode3d.scene import Object3D
-from unicode3d.shapes import bitmap_mesh, block_mesh, merge_meshes
-from unicode3d.transforms import quat_axis_angle, quat_from_matrix, quat_mul
+from unicode3d.shapes import bitmap_mesh, merge_meshes
+from unicode3d.transforms import quat_axis_angle, quat_identity
 
 from .fonts import BLOCK, GILT
 
@@ -50,18 +50,22 @@ def _gilt_mesh(glyph, first):
 
 def _stone_mesh(glyph, rng):
     """A stone per pixel, set a little proud of dark mortar filling the letter's shape."""
-    h, w = len(glyph), len(glyph[0])
     cells = np.array([[c == "#" for c in row] for row in glyph])
     if not cells.any():
         return None
-    blocks, colors = [bitmap_mesh(cells, STYLE["stone"]["depth"] * 0.7)], [MORTAR]
-    for r, row in enumerate(glyph):
-        for c, ch in enumerate(row):
-            if ch == "#":
-                centre = (c + 0.5 - w / 2, h / 2 - r - 0.5, rng.uniform(-0.12, 0.12))
-                blocks.append(block_mesh(centre, (0.8, 0.8, STYLE["stone"]["depth"] * rng.uniform(0.85, 1.0))))
-                colors.append(rng.choice(STONES))
-    return merge_meshes(blocks, colors)
+    depth = STYLE["stone"]["depth"]
+    mortar = bitmap_mesh(cells, depth * 0.7)
+    mortar.face_colors = np.tile(np.array(MORTAR, float) / 255, (len(mortar.faces), 1))
+    stones = bitmap_mesh(cells, depth, blocks=True, gap=0.2)  # a box per pixel, 24 corners and 12 faces each
+    n = int(cells.sum())
+    shift, deep, colors = np.empty(n), np.empty(n), np.empty((n, 3))
+    for k in range(n):
+        shift[k], deep[k], colors[k] = rng.uniform(-0.12, 0.12), rng.uniform(0.85, 1.0), rng.choice(STONES)
+    v = stones.vertices.reshape(n, -1, 3)
+    v[:, :, 2] = v[:, :, 2] * deep[:, None] + shift[:, None]
+    stones.vertices = v.reshape(-1, 3)
+    stones.face_colors = np.repeat(colors / 255, 12, axis=0)
+    return merge_meshes([mortar, stones])
 
 
 def letter_mesh(style, ch, first=False):
@@ -142,16 +146,9 @@ class Banner:
         self.t += dt
         if self.leaving is None and self.t >= self.arrived + self.hold:
             self.leaving = self.t
-        eye = np.asarray(camera.position, float)
-        fwd = np.asarray(camera.target, float) - eye
-        fwd /= np.linalg.norm(fwd)
-        right = np.cross(fwd, (0.0, 1.0, 0.0))
-        right /= np.linalg.norm(right)
-        up = np.cross(right, fwd)
-        rot = quat_from_matrix(np.column_stack([right, up, -fwd]))
-        tall = 2 * DISTANCE * math.tan(math.radians(camera.fov) / 2)
+        tall = camera.height_at(DISTANCE)
         unit = min(WIDTH * tall * aspect / self.width, HEIGHT * tall / self.height)
-        centre = eye + fwd * DISTANCE + up * tall * 0.12
+        lift0 = tall * 0.12  # (the letters hang from the camera, in its space: x right, y up, -z ahead)
         for i, (obj, x, y, order) in enumerate(self.letters):
             local = self.t - order * p["stagger"]
             lift, size, fade, turn = 0.0, 1.0, 1.0, 0.0
@@ -174,8 +171,9 @@ class Banner:
                     turn = self.spin[i] * u * 1.8 if self.style == "stone" else 0.0
                     fade = min(fade, 1 - u)
             wobble = 0.0 if self.style == "stone" else math.sin(self.t * 2.2 + x * 0.25) * 0.35
-            obj.position = centre + right * (x * unit) + up * ((y + lift + wobble) * unit)
-            obj.rotation = quat_mul(rot, quat_axis_angle((0.0, 0.0, 1.0), turn)) if turn else rot
+            obj.parent = camera
+            obj.position = np.array([x * unit, lift0 + (y + lift + wobble) * unit, -DISTANCE])
+            obj.rotation = quat_axis_angle((0.0, 0.0, 1.0), turn) if turn else quat_identity()
             obj.scale = unit * max(size, 0.001)
             obj.opacity = max(0.0, min(1.0, fade))
             obj.visible = obj.opacity > 0.02

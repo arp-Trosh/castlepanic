@@ -43,7 +43,6 @@ PHASE_TEXT = {"discard": "Discard & draw (optional)", "trade": "Trade (optional)
               "monsters": "Monsters move", "over": "Game over"}
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 HP_PIP = "●"
-FPS_WIDTH = len("999 fps")
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
 RING_LABELS_FAR = 26.0  # camera distance beyond which only one line of ring names shows
 # a short tag over each Monster, so it's known at a glance (set SHOW_TAGS False to drop them)
@@ -117,9 +116,10 @@ class App:
         self.session = None
         self.scene = BoardScene(seed=seed or 1, on_sound=self.sound.play)
         self.renderer = Renderer(1, 1)
-        self.controls = DisplayControls(renderer=self.renderer)  # not drawn: their keys, and the Settings screen
+        # Drawn: the frame rate only; the rest are on the Settings screen (and F2-F6).
+        self.controls = DisplayControls(renderer=self.renderer, show=("fps",))
         self.saved = settings.load()
-        self.fixed = set(fixed)
+        self.controls.apply({k: v for k, v in self.saved.items() if k not in fixed})  # (they wait for the screen)
         self.settings_index = 0
         self.form = {"players": 1, "host_players": 4, "port": TextInput(str(DEFAULT_PORT), 5),
                      "address": TextInput("127.0.0.1", 60), "name": TextInput(self.name, MAX_NAME), "bots": True,
@@ -164,10 +164,10 @@ class App:
         self.quit_armed = max(0.0, self.quit_armed - dt)
         first = self.controls.screen is None
         keys = self.controls.handle(keys, screen)
-        if first:
-            self._apply_settings()
-        elif self._settings() != self.saved:
-            self.saved = self._settings()
+        if first:  # what the saved settings and the command line came to on this terminal
+            self.saved = self.controls.settings()
+        elif self.controls.settings() != self.saved:
+            self.saved = self.controls.settings()
             settings.save(self.saved)
         rows, cols = screen.size()
         screen.erase()
@@ -177,8 +177,7 @@ class App:
             return not any(k in (ord("q"), Key.ESC) for k in keys)
         handler = getattr(self, "frame_" + self.mode)
         result = handler(screen, dt, keys, rows, cols)
-        fps = f"{min(screen.measured_fps or 0, 999):.0f} fps"
-        screen.text(rows - 1, cols - len(fps) - 1, fps, Color.WHITE, dim=True)
+        self.controls.draw(screen, rows - 1, cols - self.controls.width - 1)
         screen.refresh()
         return result is not False
 
@@ -227,19 +226,6 @@ class App:
                 ("shadows", "Shadows", c.shadows, lambda v: "on" if v else "off"),
                 ("reflections", "Reflections", c.reflections, lambda v: "on" if v else "off")]
 
-    def _settings(self):
-        return {key: w.value for key, _, w, _ in self._setting_widgets()}
-
-    def _apply_settings(self):
-        """Put the saved settings into effect (bar those given on the command line); then remember them all."""
-        for key, _, w, _ in self._setting_widgets():
-            if key in self.saved and key not in self.fixed and self.saved[key] in w.options:
-                try:
-                    w.value = self.saved[key]
-                except ValueError:  # e.g. sextant glyphs saved, but this terminal lacks Unicode
-                    pass
-        self.saved = self._settings()
-
     # ---------------------------------------------------------------------------------------------- menu
 
     MENU = ["Single Player", "Host Game", "Join Game", "Name", "Settings", "Quit"]
@@ -277,7 +263,7 @@ class App:
         help_ = "Up/Down choose  Left/Right change  Enter select  type to edit  Q quit"
         if self.menu_index == 1:
             help_ = "Left/Right seats  B bots  P port  Enter host  (port: type digits after P)"
-        screen.text(rows - 1, 1, help_[:cols - FPS_WIDTH - 3], Color.WHITE, dim=True)
+        screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
         if self.message_t > 0:
             screen.text(y0 + 12, x0 - 2, self.message, Color.RED, bold=True)
         editing = {2: f["address"], 3: f["name"]}.get(self.menu_index)
@@ -360,7 +346,7 @@ class App:
                         bold=sel)
             self.click_zones.append((x0 - 2, y0 + 2 * i, x0 + 40, y0 + 2 * i, i))
         help_ = "Up/Down choose  Left/Right change  Esc back  (kept for next time)"
-        screen.text(rows - 1, 1, help_[:cols - FPS_WIDTH - 3], Color.WHITE, dim=True)
+        screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
         n = len(widgets) + 1
         for k in keys:
             step = 0
@@ -563,7 +549,7 @@ class App:
         help_ = "1-9 card  X discard  T trade  E end turn  arrows/+/- camera  R view  H help  M sound  Q quit"
         if s.networked:
             help_ += "  Tab chat"
-        screen.text(rows - 1, 1, help_[:cols - FPS_WIDTH - 3], Color.WHITE, dim=True)
+        screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
         self._popups(screen, rows, cols)
         if self.ui.get("help"):
             self._help(screen, rows, cols)
