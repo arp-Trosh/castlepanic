@@ -48,3 +48,18 @@
   bottom-right readout is now the clickable "F4 31/30fps"; settings.py only reads and writes the file), and
   box drawing in `Screen.picture()`. The built-in `fonts.PIXEL` isn't used (the banners keep their own styled
   fonts).
+
+## After 0.11.0 (2026-10-03)
+
+- **A one-frame flash from objects made mid-frame.** An Object3D is visible from construction at the origin, scale 1,
+  no parent. The banners made one in the scene's event step, after the per-frame placement had run, so its letters
+  showed for one frame at the board's centre before being moved in front of the camera. Fixed in the game
+  (letters start hidden). Worth a line in the Object3D docs, or a `visible=` constructor argument.
+- **Proposed widget: a docked, sliding panel** (castlepanic's multiplayer chat, `App._chat_dock` in ui.py). A tab
+  in the bottom bar (label, an unread badge, ▲/▼) toggles a panel that slides up over the bottom of the 3D view
+  (0.3 s, smoothstep), drawn row by row with a background fill and clipped at the bar, so the 3D view never
+  resizes. The game had to write: the slide state and easing, the clipping of rows still under the bar, the
+  background fill (`Screen.text(bg=)` per row), the tab's click box, and keeping clicks on the panel from reaching
+  the view's camera drag. A `Drawer(Panel)` next to `DisplayControls` (`open`/`toggle()`, `draw(screen, bottom,
+  left, width)`, `contains(x, y)`, a `badge`, content drawn through a callback with clipping) would cover it, and
+  the same piece could serve help or log drawers.

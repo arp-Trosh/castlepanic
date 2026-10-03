@@ -42,6 +42,9 @@ SHORT = {"archer": "Arc", "knight": "Kni", "swordsman": "Swd", "hero": "Her", "b
          "draw2": "Dr2", "scavenge": "Scv"}
 ORDER_W = 41  # the Order of play window's width (ORDER_NARROW when the terminal is narrow)
 ORDER_NARROW = 24
+CHAT_H = 8  # the game screen's chat panel, docked in the bottom bar until wanted
+CHAT_SLIDE = 0.3  # seconds it takes to slide up out of the bar, or back down into it
+CHAT_BG = (14, 14, 20)
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 HP_PIP = "●"
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
@@ -68,9 +71,10 @@ HELP = [
     "to the Castle. Defend the 6 Towers together; survive all 49 Monster tokens to win.",
     "",
     "Your turn, a step at a time (N, Enter or NEXT STEP moves on):",
-    "  1 draw up  2 discard & draw 1 (click a card twice; solo: 2)  3 trade 1 card",
+    "  1 draw up (by itself)  2 discard & draw 1 (click a card twice; solo: 2)  3 trade 1 card",
     "  (6 players: 2, with two players)  4 play cards  5 the Monsters move  6 draw 2 Monsters",
-    "All hands are open: it's a co-operative game, so trade for what you need.",
+    "All hands are open: it's a co-operative game, so trade for what you need (click your card,",
+    "  then a player's card in Defenders, either way round).",
     "",
     "To hit a Monster the card must match its ring AND colour (red 1-2, green 3-4, blue 5-6).",
     "  Archer / Knight / Swordsman: that ring.  Any Colour: that ring, any colour.",
@@ -129,12 +133,18 @@ class App:
                      "field": 0}
         self.ui = {}  # the game screen's interaction state
         self.chat_input = None
+        self.chat_open = False  # the game screen's chat panel is up (else docked in the bottom bar)
+        self.chat_slide = 0.0  # 0 docked .. 1 up, easing between
+        self.chat_tab = (-1, -1, -1, -1)  # the bottom bar's Chat tab: x0, y0, x1, y1
+        self.chat_rect = (-1, -1, -1, -1)  # the panel as drawn now
+        self.heard = (None, 0, 0)  # (session, chat messages from others chimed for, and read)
         self.message = ""
         self.message_t = 0.0
         self.quit_armed = 0.0
         self.view = (0, 0, 1, 1)  # top, left, width, height of the 3D view
         self.hand_boxes = []  # (x0, y0, x1, y1, card id)
         self.next_box = (-1, -1, -1, -1)  # the Next Step button: x0, y0, x1, y1
+        self.side_boxes = []  # (x0, y0, x1, y1, seat, card id or None for the name) in the Defenders list
         self.click_zones = []  # (x0, y0, x1, y1, callback)
         self._demo()
         self.last_sync = 0.0
@@ -178,6 +188,7 @@ class App:
             screen.text(0, 0, "Make the terminal at least 70x20 for Castle Panic.", Color.YELLOW)
             screen.refresh()
             return not any(k in (ord("q"), Key.ESC) for k in keys)
+        self._chime()
         handler = getattr(self, "frame_" + self.mode)
         result = handler(screen, dt, keys, rows, cols)
         self.controls.draw(screen, rows - 1, cols - self.controls.width - 1)
@@ -443,13 +454,29 @@ class App:
 
     # ---------------------------------------------------------------------------------------------- chat
 
+    def _chime(self):
+        """A soft chime when another player's chat message arrives (and count it unread while the chat is docked)."""
+        s = self.session
+        if s is None:
+            return
+        who, chimed, read = self.heard
+        if who is not s:
+            chimed = read = 0
+        if s.heard > chimed:
+            self.sound.play("chat")
+        if self.chat_open or self.mode != "game":
+            read = s.heard
+        self.heard = (s, s.heard, read)
+
     def _chat_key(self, k):
-        """Tab opens the chat line (multiplayer); typing goes into it until Enter or Esc."""
+        """Tab opens the chat line (multiplayer; in the game the panel slides up with it); typing goes into it until
+        Enter (sent, the panel stays up) or Esc / Tab (the panel docks again)."""
         if not self.session or not self.session.networked:
             return False
         if self.chat_input is None:
             if k == Key.TAB:
                 self.chat_input = TextInput("", 200)
+                self.chat_open = True
                 return True
             return False
         if isinstance(k, MouseEvent):
@@ -460,21 +487,60 @@ class App:
             self.chat_input = None
         elif k in (Key.ESC, Key.TAB):
             self.chat_input = None
+            self.chat_open = False
         else:
             self.chat_input.handle(k)
         return True
 
-    def _draw_chat(self, screen, top, left, width, height):
-        screen.text(top, left, "─" * width, Color.WHITE, dim=True)
-        screen.text(top, left + 2, " Chat ", Color.CYAN)
+    def _toggle_chat(self):
+        self.chat_open = not self.chat_open
+        if not self.chat_open:
+            self.chat_input = None
+
+    def _draw_chat(self, screen, top, left, width, height, bottom=None, bg=None, hint="Tab to chat"):
+        """The chat: a title rule, the latest lines, the typing line. Rows from `bottom` down are left alone (the
+        panel sliding out from under them); bg fills the panel's background."""
+        bottom = top + height if bottom is None else bottom
+
+        def put(y, x, text, color, **kw):
+            if y < bottom:
+                screen.text(y, x, text, color, bg=bg, **kw)
+        if bg is not None:
+            for y in range(top, top + height):
+                put(y, left, " " * width, Color.WHITE)
+        put(top, left, "─" * width, Color.WHITE, dim=True)
+        put(top, left + 2, " Chat ", Color.CYAN)
         lines = [t for t, kind in self.session.log if kind in ("chat", "system")][-(height - 2):]
         for i, t in enumerate(lines):
-            screen.text(top + 1 + i, left + 1, t[:width - 2], Color.WHITE if ":" in t else Color.CYAN)
+            put(top + 1 + i, left + 1, t[:width - 2], Color.WHITE if ":" in t else Color.CYAN)
         y = top + height - 1
         if self.chat_input is not None:
-            screen.text(y, left + 1, ("> " + self.chat_input.value + "_")[-(width - 2):], Color.YELLOW)
+            put(y, left + 1, ("> " + self.chat_input.value + "_")[-(width - 2):], Color.YELLOW)
         else:
-            screen.text(y, left + 1, "Tab to chat", Color.WHITE, dim=True)
+            put(y, left + 1, hint, Color.WHITE, dim=True)
+
+    def _chat_dock(self, screen, dt, view_bottom, width, bar_y, bar_right):
+        """The game screen's chat (multiplayer): a Chat tab in the bottom bar (with the unread count), and the panel,
+        which slides up over the bottom of the 3D view when opened and back down into the bar when closed."""
+        s = self.session
+        up = self.chat_open or self.chat_input is not None
+        step = dt / CHAT_SLIDE
+        self.chat_slide = min(1.0, self.chat_slide + step) if up else max(0.0, self.chat_slide - step)
+        k = self.chat_slide
+        e = k * k * (3 - 2 * k)  # ease in and out
+        shown = round(CHAT_H * e)
+        self.chat_rect = (0, view_bottom - shown, width - 1, view_bottom - 1) if shown else (-1, -1, -1, -1)
+        if shown:
+            self._draw_chat(screen, view_bottom - shown, 0, width, CHAT_H, bottom=view_bottom, bg=CHAT_BG,
+                            hint="Tab to chat  (Chat in the bar, or Esc while typing, docks it)")
+        unread = s.heard - self.heard[2] if self.heard[0] is s else 0
+        arrow = ("▼" if up else "▲") if screen.unicode else ("v" if up else "^")
+        label = f" Chat {arrow} " + (f"({unread}) " if unread and not up else "")
+        x = bar_right - len(label)
+        screen.text(bar_y, x, label, Color.YELLOW if unread and not up else Color.CYAN, reverse=True,
+                    bold=bool(unread and not up))
+        self.chat_tab = (x, bar_y, x + len(label) - 1, bar_y)
+        return x
 
     # ---------------------------------------------------------------------------------------------- game
 
@@ -489,9 +555,10 @@ class App:
         self._new_scene()
         self.mode = "game"
         self.ui = {"mode": None}
+        self.chat_open, self.chat_slide, self.chat_rect = False, 0.0, (-1, -1, -1, -1)
         self.log = []
         events = [e for e in events if e.get("e") != "_sync"]
-        if not (g and g.turn == 1 and g.phase == "draw_up"):  # (not a fresh game: just catch up)
+        if not (g and g.turn == 1 and g.phase == "discard" and not g.discards_used):  # (not a fresh game: just catch up)
             if g:
                 self.scene.sync(g)
             self._feed(events)
@@ -537,8 +604,7 @@ class App:
         g = s.game
         side = 38 if cols >= 140 else 32
         hand_h = 8
-        chat_h = 6 if s.networked else 0
-        view_h = rows - 1 - hand_h - chat_h - 1
+        view_h = rows - 1 - hand_h - 1
         view_w = cols - side
         self.scene.aspect = view_w * self.renderer.cell_aspect / max(view_h, 1)
         self._draw_view(screen, 1, 0, view_w, view_h)
@@ -549,12 +615,13 @@ class App:
         order_w = ORDER_W if cols >= 110 else ORDER_NARROW
         self._hand(screen, 1 + view_h, 0, cols - order_w, hand_h)
         self._order(screen, 1 + view_h, cols - order_w, order_w, hand_h)
-        if chat_h:
-            self._draw_chat(screen, rows - 1 - chat_h, 0, cols, chat_h)
+        bar_right = cols - self.controls.width - 2
+        if s.networked:
+            bar_right = self._chat_dock(screen, dt, 1 + view_h, view_w, rows - 1, bar_right) - 1
         help_ = "1-9 card  N/Enter next step  X discard  T trade  arrows/+/- camera  R view  H help  M sound  Q quit"
         if s.networked:
             help_ += "  Tab chat"
-        screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
+        screen.text(rows - 1, 1, help_[:max(0, bar_right - 2)], Color.WHITE, dim=True)
         self._popups(screen, rows, cols)
         if self.ui.get("help"):
             self._help(screen, rows, cols)
@@ -688,24 +755,28 @@ class App:
         y = top
         screen.text(y, x, "Defenders", Color.CYAN, bold=True)
         y += 1
-        offer = g.trade_offer
+        self.side_boxes = []
         for i, name in enumerate(s.names):
             cur = i == g.current
             mark = "▶" if cur and screen.unicode else (">" if cur else " ")
             you = "*" if i == s.my_seat else ""
             line = f"{mark}{i + 1} {name[:12]}{you}"
-            screen.text(y, x, line, Color.YELLOW if cur else Color.WHITE, bold=cur)
+            partner = self.ui.get("partner") == i
+            screen.text(y, x, line, Color.YELLOW if cur else Color.WHITE, bold=cur or partner, reverse=partner)
             sc = f"{g.score(i)}pt"
             screen.text(y, x + width - len(sc), sc, Color.WHITE)
+            self.side_boxes.append((x, y, x + width - 1, y, i, None))
             y += 1
             xx = x + 2
             for k, c in enumerate(g.hand(i)):
+                cid = g.hands[i][k]
                 lab = SHORT[c["kind"]]
-                if self.ui.get("mode") == "trade_take" and self.ui.get("partner") == i:
+                if self.ui.get("mode") == "trade_take" and partner:
                     lab = f"{LETTERS[k]}{lab}"
                 if xx + len(lab) >= x + width:
                     break
-                screen.text(y, xx, lab, card_color(c))
+                screen.text(y, xx, lab, card_color(c), reverse=self.ui.get("take") == cid)
+                self.side_boxes.append((xx, y, xx + len(lab) - 1, y, i, cid))
                 xx += len(lab) + 1
             y += 1
         y += 1
@@ -857,11 +928,14 @@ class App:
         if mode == "pair":
             return f"{card_title(g.cards[ui['card']])}: now choose a {ui['need'].capitalize()} to go with it (Esc cancels)"
         if mode == "trade_give":
-            return "Trade: which of your cards do you give? (number, Esc cancels)"
+            if ui.get("take") is not None:
+                return (f"Trade for {s.names[ui['partner']]}'s {card_title(g.cards[ui['take']])}: which of your cards "
+                        "do you give? (click or number, Esc cancels)")
+            return "Trade: which of your cards do you give? (click or number, Esc cancels)"
         if mode == "trade_partner":
-            return "Trade with which player? (their number, Esc cancels)"
+            return "Trade with whom? Click their name or the card you want in Defenders, or their number (Esc cancels)"
         if mode == "trade_take":
-            return f"Which of {s.names[ui['partner']]}'s cards do you want? (letter, Esc cancels)"
+            return f"Which of {s.names[ui['partner']]}'s cards do you want? (click or letter, Esc cancels)"
         if g.trade_offer:
             return f"Waiting for {s.names[g.trade_offer['to']]} to answer the trade..."
         if g.pending:
@@ -872,8 +946,6 @@ class App:
             return f"{s.names[g.current]} is defending..."
         if self.scene.busy():
             return "..."
-        if g.phase == "draw_up":
-            return "Your turn! Your hand is drawn up. Next Step to discard"
         if g.phase == "discard":
             if g.discards_used >= g.max_discards:
                 return "Discarded. Next Step to " + ("trade" if g.max_trades else "play cards")
@@ -881,7 +953,7 @@ class App:
         if g.phase == "trade":
             if g.trades_used >= g.max_trades:
                 return "Traded. Next Step to play cards"
-            return "Trade: click a card of yours to give (optional), or Next Step to pass"
+            return "Trade: click a card of yours to give, or one of theirs in Defenders (optional), or Next Step to pass"
         if g.phase == "play":
             return "Play cards (click or number), then Next Step: the Monsters move"
         if g.phase == "move":
@@ -920,6 +992,14 @@ class App:
 
     # ---- input
     def _mouse(self, ev):
+        x0, y0, x1, y1 = self.chat_tab
+        if self.session.networked and x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
+            if ev.pressed and ev.button == MouseEvent.LEFT and not ev.moved:
+                self._toggle_chat()
+            return
+        x0, y0, x1, y1 = self.chat_rect
+        if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
+            return  # (the chat panel, over the 3D view)
         if self._mouse_view(ev):
             return
         if not (ev.pressed and ev.button == MouseEvent.LEFT) or ev.moved:
@@ -935,11 +1015,42 @@ class App:
                 if cid in hand:
                     self._card_key(hand.index(cid))
                 return
+        for x0, y0, x1, y1, seat, cid in self.side_boxes:
+            if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
+                self._side_click(seat, cid)
+                return
         top, left, w, h = self.view
         if left <= ev.x < left + w and top <= ev.y < top + h:
             mid = self.scene.monster_at_cell(self.renderer, ev.x - left, ev.y - top)
             if mid is not None and self.ui.get("mode") == "target" and mid in self.ui.get("letters", {}):
                 self._choose_monster(mid)
+
+    def _side_click(self, seat, cid):
+        """A click on a Defender's name or one of their cards: in your Trade step, whom to trade with and for what."""
+        s, g, ui = self.session, self.session.game, self.ui
+        me = s.my_seat
+        if seat == me:
+            if cid in g.hands[me]:
+                self._card_key(g.hands[me].index(cid))
+            return
+        if not (g.current == me and g.phase == "trade" and g.trades_used < g.max_trades and not g.trade_offer):
+            if g.current == me and g.phase in ("discard", "trade") and not g.trade_offer:
+                self.flash("No more trades this turn" if g.phase == "trade" else "Trading is step 3, after discarding")
+            return
+        if seat in g.traded_with:
+            self.flash(f"You've traded with {s.names[seat]} already: the second trade is with someone else")
+            return
+        if not g.hands[seat]:
+            self.flash(f"{s.names[seat]} has no cards")
+            return
+        give = ui.get("give") if ui.get("mode") in ("trade_partner", "trade_take") else None
+        if give is None:  # theirs first: then which of yours
+            self.ui = {"mode": "trade_give", "partner": seat, "take": cid}
+        elif cid is None:
+            self.ui = dict(ui, mode="trade_take", partner=seat)
+        else:
+            self._send({"a": "offer", "to": seat, "give": give, "take": cid})
+            self._reset_ui()
 
     def _send(self, action):
         try:
@@ -1076,7 +1187,13 @@ class App:
             return
         if mode in ("trade_give", "trade_partner", "trade_take") or (mode is None and g.current == me and g.phase == "trade" and
                                     g.trades_used < g.max_trades and not g.trade_offer):
-            self.ui = {"mode": "trade_partner", "give": cid, "chosen": [cid]}
+            if ui.get("take") is not None:  # (their card was clicked first)
+                self._send({"a": "offer", "to": ui["partner"], "give": cid, "take": ui["take"]})
+                self._reset_ui()
+            elif ui.get("partner") is not None:
+                self.ui = {"mode": "trade_take", "partner": ui["partner"], "give": cid, "chosen": [cid]}
+            else:
+                self.ui = {"mode": "trade_partner", "give": cid, "chosen": [cid]}
             return
         if mode == "nice":
             c = g.cards[cid]

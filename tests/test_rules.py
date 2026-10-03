@@ -128,6 +128,14 @@ class Rules(unittest.TestCase):
         g._boulder()
         self.assertNotIn(far["id"], g.monsters)
 
+    def test_boss_power_only_for_bosses(self):
+        g = Game(["a"], seed=7)
+        g.take_events()
+        g._resolve_token("orc")
+        self.assertNotIn("boss_power", [e["e"] for e in g.take_events()])
+        g._resolve_token("healer")
+        self.assertIn("boss_power", [e["e"] for e in g.take_events()])
+
     def test_illegal(self):
         g = Game(["a", "b"], seed=8)
         with self.assertRaises(IllegalMove):
@@ -137,14 +145,11 @@ class Rules(unittest.TestCase):
 
     def test_steps_in_order(self):
         g = Game(["a", "b"], seed=10)
-        self.assertEqual(g.phase, "draw_up")
+        self.assertEqual(g.phase, "discard")  # Draw Up moves on by itself
+        self.assertIn({"e": "step", "seat": 0, "step": "discard"}, g.take_events())
         hit = next(c for c in g.hands[0])
         with self.assertRaises(IllegalMove):  # nothing is played before step 4
             apply(g, 0, {"a": "play", "card": hit})
-        with self.assertRaises(IllegalMove):
-            apply(g, 0, {"a": "discard", "card": hit})
-        apply(g, 0, {"a": "next"})
-        self.assertEqual(g.phase, "discard")
         apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
         with self.assertRaises(IllegalMove):  # one discard
             apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
@@ -168,11 +173,11 @@ class Rules(unittest.TestCase):
         self.assertIn("draw_monsters", ev)
         self.assertLess(len(g.pile), pile)
         if not g.pending:
-            self.assertEqual((g.current, g.phase), (1, "draw_up"))
+            self.assertEqual((g.current, g.phase), (1, "discard"))
+            self.assertEqual(len(g.hands[1]), g.hand_size)
 
     def test_solo_two_discards_no_trade(self):
         g = Game(["solo"], seed=11)
-        apply(g, 0, {"a": "next"})
         apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
         apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
         with self.assertRaises(IllegalMove):
@@ -182,7 +187,6 @@ class Rules(unittest.TestCase):
 
     def test_six_players_trade_with_two(self):
         g = Game(list("abcdef"), seed=12)
-        apply(g, 0, {"a": "next"})
         apply(g, 0, {"a": "next"})
         apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
         apply(g, 1, {"a": "answer", "accept": True})

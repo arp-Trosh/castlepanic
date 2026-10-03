@@ -31,6 +31,7 @@ TAR = blob_mesh((0.5, 0.06, 0.5))
 SPAWN_AFTER = 0.5  # seconds after "tHe mOnsTeRs aRe CoMing!" that they appear
 TOKEN_AFTER = 0.5  # seconds after a drawn Monster token is announced that it takes effect
 TOKEN_HOLD = 1.0  # seconds its name stays up
+DRAW_UP_HOLD = 0.6  # seconds Draw Up stays lit in the Order of play before Discard
 # what each Monster token says as it is drawn, in gilt lettering (the font has no digits)
 TOKEN_BANNER = {
     "goblin": ["A Goblin!"], "orc": ["An Orc!"], "troll": ["A Troll!"], "goblin_king": ["The Goblin King!"],
@@ -403,6 +404,10 @@ class BoardScene:
 
     # ---- turns and cards
     def _ev_step(self, e):
+        if self.step == (e["seat"], "draw_up") and not e.get("held"):  # Draw Up moves on by itself: leave it lit
+            self.queue.insert(0, dict(e, held=True))  # a moment first
+            self.wait = DRAW_UP_HOLD
+            return
         self.step = (e["seat"], e["step"])
 
     def _ev_turn(self, e):

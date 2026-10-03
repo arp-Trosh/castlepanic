@@ -4,9 +4,10 @@ The board is six arcs (0..5, printed 1..6, numbered clockwise) by five rings: CA
 KNIGHT, ARCHER and FOREST (4, where Monsters arrive). Arcs 0-1 are red, 2-3 green, 4-5 blue. A Wall stands on the
 line between each arc's Swordsman ring and its Castle space.
 
-A turn goes through six steps (`STEPS`, `game.phase`), and the player moves on from each with `next_step`:
-draw up, discard and draw 1 (two in solo), trade 1 card (in a 6-player game 2, with two different players), play
-cards, the Monsters move, 2 new Monsters are drawn; then the next player draws up. All hands are open: this is a
+A turn goes through six steps (`STEPS`, `game.phase`): draw up (done for the player, straight on to step 2),
+discard and draw 1 (two in solo), trade 1 card (in a 6-player game 2, with two different players), play cards, the
+Monsters move, 2 new Monsters are drawn; the player moves on from each with `next_step`; then the next player
+draws up. All hands are open: this is a
 co-operative game.
 
 `Game` holds the state as plain data (`to_dict`/`from_dict` round-trip it through JSON, which is how the host sends
@@ -308,6 +309,8 @@ class Game:
         self.events.append(Event("turn", seat=self.current, turn=self.turn))
         if not first:  # (the first player's hand was just dealt)
             self._fill_hand(self.current)
+        self.phase = "discard"  # nothing to decide in Draw Up: straight on to step 2
+        self.events.append(Event("step", seat=self.current, step=self.phase))
 
     def _fill_hand(self, seat):
         while len(self.hands[seat]) < self.hand_size:
@@ -345,7 +348,7 @@ class Game:
 
     def next_step(self, seat):
         """On to the next step of the turn. From Play the Monsters move; from Monsters Move 2 new Monsters are drawn,
-        and then the next player's turn begins (at Draw Up)."""
+        and then the next player's turn begins (Draw Up, which moves on to Discard by itself)."""
         self._check(seat)
         if self.phase in ("draw_up", "discard", "trade"):
             self.phase = {"draw_up": "discard", "discard": "trade" if self.max_trades else "play",
@@ -641,7 +644,8 @@ class Game:
             arc = self.rng.randrange(ARCS)
             self.events.append(Event("roll", value=arc + 1))
             m = self._spawn(kind, arc)
-            self.events.append(Event("boss_power", kind=kind, mid=m["id"]))
+            if kind in BOSSES:
+                self.events.append(Event("boss_power", kind=kind, mid=m["id"]))
             if kind == "goblin_king":
                 self.to_draw += 3
             elif kind == "orc_warlord":

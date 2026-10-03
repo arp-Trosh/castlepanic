@@ -31,6 +31,10 @@ class Net(unittest.TestCase):
             client.chat("hello there")
             pump(host, client, 1, until=lambda: any("hello there" in t for t, _ in host.log))
             self.assertTrue(any("Guest: hello there" in t for t, _ in host.log))
+            host.chat("welcome")
+            pump(host, client, 1, until=lambda: any("Hostess: welcome" in t for t, _ in client.log))
+            pump(host, client, 0.2)  # (the guest's own line, echoed back)
+            self.assertEqual((host.heard, client.heard), (1, 1))  # each chimes for the other's line, not their own
             # host ends turn; bot plays; then it's the guest's turn: guest ends turn over the network
             host.act({"a": "end"})
             pump(host, client, 5, until=lambda: client.game.current == 1)

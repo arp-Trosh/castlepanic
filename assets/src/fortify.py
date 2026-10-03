@@ -19,15 +19,17 @@ def jp(name, at=(0, 0, 0), turn=(0, 0, 0), parent=None):
 
 root = jp("Root")
 stakes = []
-TALL, LONG = 1.4, 1.2  # bigger than life beside the Wall, so a fortified Wall reads at a glance
-n = 15
+# bigger than life beside the Wall, so a fortified Wall reads at a glance: the stake tips (1.12-1.24 tall, leaning)
+# stand just above the Wall's battlements (1.0)
+TALL, LONG = 1.55, 1.25
+n = 16
 for i in range(n):
     x = LONG * (-1.04 + i * 2.08 / (n - 1)) + float(rng.uniform(-0.03, 0.03))
-    h = TALL * float(rng.uniform(0.62, 0.8))
-    r = float(rng.uniform(0.045, 0.06))
+    h = TALL * float(rng.uniform(0.72, 0.8))
+    r = float(rng.uniform(0.055, 0.072))
     lean = (float(rng.uniform(7, 13)), float(rng.uniform(-5, 5)), float(rng.uniform(0, 60)))
     p = jp(f"Stake{i}", at=(x, float(rng.uniform(-0.02, 0.02)), 0), turn=lean, parent=root)
-    tip = 0.14 + float(rng.uniform(-0.02, 0.03))
+    tip = 0.16 + float(rng.uniform(-0.02, 0.03))
     piece("cylinder", f"Shaft{i}", size=(2 * r, 2 * r, h - tip), at=(0, 0, (h - tip) / 2), verts=6, mat=M["wood"],
           parent=p, jitter=0.004, flat_shade=True, tile=0.4)
     tp = jp(f"Tip{i}", at=(0, 0, h - tip), parent=p)
@@ -41,7 +43,7 @@ for i in range(n):
 rails = []
 for k, (z, y) in enumerate(((0.2 * TALL, -0.085), (0.46 * TALL, -0.13))):
     p = jp(f"Rail{k}", at=(0, y, z), turn=(0, 1.5 * (1 - 2 * k), 0), parent=root)
-    piece("cylinder", f"RailPole{k}", size=(0.05, 0.05, 2.15 * LONG), shape_turn=(0, 90, 0), verts=6, mat=M["wood"],
+    piece("cylinder", f"RailPole{k}", size=(0.06, 0.06, 2.15 * LONG), shape_turn=(0, 90, 0), verts=6, mat=M["wood"],
           parent=p, jitter=0.003, flat_shade=True)
     for i, (_, _, x, _) in enumerate(stakes):
         if i % 2 == k:

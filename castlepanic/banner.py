@@ -117,6 +117,7 @@ class Banner:
                 if mesh is not None:
                     obj = Object3D(mesh, color=(255, 255, 255), cast_shadows=False, specular=2.0 if style == "gilt"
                                    else 0.2, shininess=40, emissive=0.3)
+                    obj.visible = False  # until update() has placed it (else it shows at the origin for a frame)
                     self.letters.append((obj, x + w / 2, y, order))
                     order += 1
                 x += w + 1

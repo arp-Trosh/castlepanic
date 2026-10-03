@@ -29,8 +29,7 @@ def main():
     run(30, [])
     shot(screen, "assets/previews/ui_game0.png")
     g = app.session.game
-    run(1, [ord("n")]); run(3, [])  # draw up -> discard
-    run(1, [ord("1")]); run(3, [])
+    run(1, [ord("1")])  # (Draw Up moves on to Discard by itself); run(3, [])
     shot(screen, "assets/previews/ui_discard.png")
     run(1, [Key.ESC]); run(1, [ord("n")]); run(3, [])  # (solo: no trade) -> play
     # try to play the first playable hit card on its first target

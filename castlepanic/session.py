@@ -28,15 +28,18 @@ class SessionBase:
         self.my_seat = None
         self.seats = []  # [{"name", "kind": "human"|"bot"|"remote", "cid"}]
         self.log = []  # (text, kind) kind: "chat", "system", "game"
+        self.heard = 0  # chat messages from other players so far (for the chime and the unread count)
         self.phase = "lobby"
         self.error = None
         self.bot_delay = 0.7  # seconds between a bot's moves
         self.is_host = False
         self.networked = False
 
-    def say(self, text, kind="system"):
+    def say(self, text, kind="system", mine=False):
         self.log.append((text, kind))
         del self.log[:-300]
+        if kind == "chat" and not mine:
+            self.heard += 1
 
     @property
     def names(self):
@@ -129,7 +132,7 @@ class HostSession(SessionBase):
         if not text:
             return
         name = self.seats[self.my_seat]["name"]
-        self.say(f"{name}: {text}", "chat")
+        self.say(f"{name}: {text}", "chat", mine=True)
         if self.server:
             self.server.broadcast({"t": "chat", "name": name, "text": text})
 
@@ -263,6 +266,7 @@ class ClientSession(SessionBase):
         self.networked = True
         self.client = Client(host, port)
         self.client.send({"t": "hello", "name": clean(name, MAX_NAME), "protocol": PROTOCOL})
+        self.my_name = None  # as the host welcomed us (it may add a number)
         self.max_players = 0
         self.bots_on = True
         self.say(f"Connected to {host}:{port}.")
@@ -311,7 +315,7 @@ class ClientSession(SessionBase):
                 events += msg["events"]
             elif t == "chat":
                 self.say(f"{msg['name']}: {msg['text']}" if msg.get("name") else msg["text"],
-                         "chat" if msg.get("name") else "system")
+                         "chat" if msg.get("name") else "system", mine=msg.get("name") == self.my_name)
             elif t == "error":
                 self.say(f"(host: {msg.get('msg')})")
         return events

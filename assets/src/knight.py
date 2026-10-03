@@ -216,8 +216,8 @@ def build_knight():
     set_rot(j["Head"], (0, 4, 0))
 
     plate(j, None, d, steel, dark)
-    # tabard over the torso, skirt panels front and back
-    block("TabardTop", (w * 2.75, w * 1.85, 0.2 * s), at=(0, 0, 0.1 * s), mat=blue, parent=j["Chest"],
+    # tabard over the torso, skirt panels front and back (a little taller than the Torso, so no faces share a plane)
+    block("TabardTop", (w * 2.75, w * 1.85, 0.212 * s), at=(0, 0, 0.1 * s), mat=blue, parent=j["Chest"],
           taper=(1.12, 1.0), taper_bottom=(0.86, 0.92))
     block("TabardMid", (w * 2.15, w * 1.75, 0.17 * s), at=(0, 0, 0.08 * s), mat=blue, parent=j["Spine"],
           taper=(1.1, 1.05))

@@ -16,7 +16,7 @@ import numpy as np
 from numba import njit
 
 RATE = 22050
-VERSION = 4  # (bump when a sound changes: they are made once and cached)
+VERSION = 5  # (bump when a sound changes: they are made once and cached)
 
 
 def _t(dur):
@@ -242,6 +242,13 @@ def make_sounds():
     call = horn([(147, 0.3), (147, 0.18), (196, 0.3), (220, 0.3), (294, 1.4)], 2.4)
     roll = [(drum(0.4, 60 if k % 4 else 50), 0.25 * k) for k in range(12)]
     S["start"] = _norm(_mix((call, 0.1), *roll, (drum(0.9, 45) * 1.4, 3.0)), 0.8)
+    # a chat message from another player: a soft two-note chime, rising a fifth, each note a struck bell
+    # (a sine with a quiet inharmonic partial, dying away)
+    def bell(f, d):
+        t = _t(d)
+        return (np.sin(2 * np.pi * f * t) + 0.25 * np.sin(2 * np.pi * f * 2.76 * t) * np.exp(-t * 18)) * \
+            np.exp(-t * 7) * _env(len(t), 0.004, 0.05)
+    S["chat"] = _norm(_mix((bell(880, 0.5), 0), (bell(1319, 0.6), 0.11)), 0.3)
     S["spawn"] = S["growl_orc"]
     S["hit"] = S["arrow_hit"]
     return S

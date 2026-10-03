@@ -4,7 +4,7 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
 
 ## Done
 - **Rules** (`rules.py`): the full standard game + solo variant; JSON state for the network. A turn is six steps
-  (`STEPS`), each moved on from with the `next` action: draw up, discard 1 (solo 2), trade 1 (6 players: 2, with
+  (`STEPS`), each moved on from with the `next` action (Draw Up moves on to Discard by itself): draw up, discard 1 (solo 2), trade 1 (6 players: 2, with
   two different players), play, Monsters move, draw 2 Monsters. Tests: `tests/test_rules.py`
   (incl. 300 all-bot games checking cards/tokens are conserved), `tests/test_net.py` (lobby, start, chat, remote
   turns, out-of-turn errors, disconnect -> bot).
@@ -33,8 +33,11 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   Brick and Mortar are chosen one after the other. Each drawn Monster token is named in gilt lettering (after
   "tHe mOnsTeRs aRe CoMing!"), then 0.5 s before it takes effect. Missing: "Missing! / No Monsters this turn / (whew!)" in gilt, with a relief
   sound ("phew" + a suspended-to-major horn chord). Monsters sharing a space shrink (85% for two, 70% for three or
-  more); in a Castle space whose Tower has fallen they stand on the rubble. The Fortify palisade is 1.4x taller and
-  1.2x longer.
+  more); in a Castle space whose Tower has fallen they stand on the rubble. The Fortify palisade's stake tips stand
+  just above the battlements (1.12-1.24 tall against the wall's 1.0), on thicker stakes, 1.25x the wall's length.
+  Trading by mouse: click your card and one of theirs (or their name) in the Defenders list, either way round.
+  Multiplayer chat docks in the bottom bar (a Chat tab with an unread count; click or Tab slides it up over the
+  view, Esc/Tab/click docks it) and chimes softly (`chat` in sound.py) for other players' messages.
 - **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections on the menu's Settings
   screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
   shows only the frame rate (achieved/target, clickable).

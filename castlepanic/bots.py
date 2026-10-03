@@ -235,7 +235,7 @@ def next_action(game, seat, offered=None):
     if game.phase == "play":
         play = best_play(game, seat)
         return play or dict(a="next")
-    if game.phase in ("draw_up", "move"):
+    if game.phase == "move":
         return dict(a="next")
     return None
 
