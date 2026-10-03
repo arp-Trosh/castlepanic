@@ -92,7 +92,7 @@ class CameraRig:
 
 class BoardScene:
     def __init__(self, library=None, seed=1, on_sound=None):
-        self.lib = library or Library()
+        self.lib = library or Library.shared()
         self.rng = random.Random(seed)
         self.on_sound = on_sound or (lambda name, **kw: None)
         self.fx = Effects(self.rng)

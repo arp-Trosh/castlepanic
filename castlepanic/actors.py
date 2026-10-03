@@ -6,6 +6,7 @@ import copy
 import math
 import os
 import random
+import threading
 
 import numpy as np
 
@@ -19,17 +20,47 @@ UP = np.array([0.0, 1.0, 0.0])
 
 
 class Library:
+    _shared = None
+
     def __init__(self, folder=MODELS):
         self.folder = folder
         self.models = {}
+        self._locks = {}  # name: a lock held while that model loads (the preloader and the game may want it at once)
+        self._locks_lock = threading.Lock()
+
+    @classmethod
+    def shared(cls):
+        """The library every board uses, loaded once a run (a new game doesn't load the models again), with the
+        models no board starts with loading in the background (see preload)."""
+        if cls._shared is None:
+            cls._shared = cls()
+            threading.Thread(target=cls._shared.preload, name="preload models", daemon=True).start()
+        return cls._shared
 
     def has(self, name):
         return name in self.models or os.path.exists(os.path.join(self.folder, name + ".glb"))
 
     def _load(self, name):
-        if name not in self.models:
-            self.models[name] = load_model(os.path.join(self.folder, name + ".glb"))
-        return self.models[name]
+        if name in self.models:
+            return self.models[name]
+        with self._locks_lock:
+            lock = self._locks.setdefault(name, threading.Lock())
+        with lock:
+            if name not in self.models:
+                model = load_model(os.path.join(self.folder, name + ".glb"))
+                for o in model.objects:  # (a texture's mipmaps, built now rather than when it is first drawn)
+                    if o.mesh is not None:
+                        for m in range(len(o.mesh.textures)):
+                            o.mesh.mipmaps(m)
+                self.models[name] = model
+            return self.models[name]
+
+    def preload(self):
+        """Load every model in the folder, so that a monster's first appearance doesn't pause the game while its
+        model loads (50-150 ms each, about a second for all)."""
+        for f in sorted(os.listdir(self.folder)):
+            if f.endswith(".glb"):
+                self._load(f[:-4])
 
     def instance(self, name):
         """A fresh copy of a model: new nodes and parts (sharing meshes), clips rebound to them."""
