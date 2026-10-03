@@ -15,7 +15,7 @@ sc = BoardScene(seed=seed)
 sc.sync(g); g.take_events()
 r = Renderer(200, 60, (2, 3), background=(18, 16, 22))
 shots, frames, t0, rt = 0, 0, time.time(), 0
-offered = {0: set(), 1: set()}
+offered = {s: set() for s in range(g.players)}
 while g.phase != "over" and g.turn <= turns:
     seats = [s for s in g.pending] or ([g.trade_offer["to"]] if g.trade_offer else [g.current])
     apply(g, seats[0], bots.next_action(g, seats[0], offered[seats[0]]))

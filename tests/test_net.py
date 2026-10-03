@@ -36,12 +36,21 @@ class Net(unittest.TestCase):
             pump(host, client, 5, until=lambda: client.game.current == 1)
             self.assertEqual(client.game.current, 1)
             client.act({"a": "end"})
-            # the bot then plays at once until it needs the host (its turn, or a trade the bot offers it): wait for
+            # the bot then plays at once until it needs the host (its turn, or a trade the bot offers it; the guest
+            # turns down any it is offered): wait for
             # that, and for the client to hear all of it (comparing as soon as the host moved on raced the update)
+            answered = []
+
             def waiting_on(g):
                 return list(g.pending) or ([g.trade_offer["to"]] if g.trade_offer else [g.current])
 
             def in_step():
+                g = client.game
+                if g.trade_offer and g.trade_offer["to"] == 1 and not answered:  # the bot asks the guest for a card
+                    answered.append(1)
+                    client.act({"a": "answer", "accept": False})
+                elif not g.trade_offer:
+                    answered.clear()
                 return (waiting_on(host.game) == [0] and waiting_on(client.game) == [0]
                         and (client.game.turn, client.game.phase) == (host.game.turn, host.game.phase))
 

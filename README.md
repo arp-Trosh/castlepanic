@@ -25,10 +25,10 @@ minimum that's comfortable.
 
 | Key | |
 |---|---|
-| 1-9 or click | choose a card from your hand; then a letter (or click) picks the Monster, a number the Wall |
-| X | discard and draw (start of your turn) |
-| T | trade: your card, the player, their card (they accept with Y or decline with N) |
-| E | end your turn: the Monsters move and new ones come |
+| N, Enter or NEXT STEP | on to the next step of your turn (the Order of play window, bottom right, shows where you are) |
+| 1-9 or click | choose a card from your hand; then a letter (or click) picks the Monster, a number the Wall. Brick + Mortar: choose both |
+| X | in the Discard step, discard the chosen card and draw (or click it again) |
+| T | in the Trade step: your card (or click it), the player, their card (they accept with Y or decline with N) |
 | arrows / WASD, +/-, wheel | turn, tilt and zoom the camera; R resets it |
 | M | sound on/off |
 | Q (twice) | leave the game |
@@ -37,6 +37,10 @@ minimum that's comfortable.
 Everything the 3D shows is also in the log on the right (what was played, what moved, what fell).
 
 ## Rules
+
+A turn goes in six steps: 1 draw up, 2 discard and draw 1 (solo: 2), 3 trade 1 card with another player (6 players:
+2, with two different players), 4 play cards, 5 the Monsters move, 6 draw 2 new Monsters. Steps 2 and 3 can be
+passed. It's co-operative: every hand is open to all, so trade for what the team needs.
 
 Standard Castle Panic: hit Monsters with cards matching their ring and colour, rebuild Walls with Brick + Mortar,
 survive all 49 Monster tokens. Most points of slain Monsters is the Master Slayer. The Monster pile's effect tokens

@@ -15,7 +15,7 @@ from .rules import Game, IllegalMove, apply
 MAX_NAME = 16
 BOT_NAMES = ["Sir Aldric", "Brother Hode", "Dame Isolde", "Old Tam", "Wynn the Bow", "Garrick", "Mother Ebba",
              "Fennick", "Black Rowan", "Ulfgar"]
-PROTOCOL = 1
+PROTOCOL = 2
 
 
 def clean(text, limit):

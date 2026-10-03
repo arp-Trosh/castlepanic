@@ -4,8 +4,13 @@ The board is six arcs (0..5, printed 1..6, numbered clockwise) by five rings: CA
 KNIGHT, ARCHER and FOREST (4, where Monsters arrive). Arcs 0-1 are red, 2-3 green, 4-5 blue. A Wall stands on the
 line between each arc's Swordsman ring and its Castle space.
 
+A turn goes through six steps (`STEPS`, `game.phase`), and the player moves on from each with `next_step`:
+draw up, discard and draw 1 (two in solo), trade 1 card (in a 6-player game 2, with two different players), play
+cards, the Monsters move, 2 new Monsters are drawn; then the next player draws up. All hands are open: this is a
+co-operative game.
+
 `Game` holds the state as plain data (`to_dict`/`from_dict` round-trip it through JSON, which is how the host sends
-it to clients). Each move (`discard`, `trade`, `play`, `build`, `end_turn`, ...) checks it is legal, raises
+it to clients). Each move (`discard`, `trade`, `play`, `next_step`, ...) checks it is legal, raises
 `IllegalMove` if not, and appends `Event`s to `game.events`: what happened, in order, for the scene to animate and
 the log to tell. Randomness comes from `game.rng`, seeded, so a game replays exactly.
 """
@@ -115,7 +120,10 @@ def Event(_e, **data):
 
 # ------------------------------------------------------------------------------------------------ the game
 
-PHASES = ("discard", "trade", "play", "monsters", "over")
+# the steps of a turn, in order (game.phase); "over" once the game has ended
+STEPS = ("draw_up", "discard", "trade", "play", "move", "draw_monsters")
+STEP_TITLES = {"draw_up": "Draw Up", "discard": "Discard & Draw 1", "trade": "Trade", "play": "Play Cards",
+               "move": "Monsters Move", "draw_monsters": "Draw 2 Monsters", "over": "Game Over"}
 
 
 class Game:
@@ -148,9 +156,10 @@ class Game:
         self.events = []
         self.turn = 0  # how many turns have begun
         self.current = 0
-        self.phase = "discard"
+        self.phase = "draw_up"
         self.discards_used = 0
         self.trades_used = 0
+        self.traded_with = []  # seats traded with this turn (a 6-player game's two trades are with two players)
         self.no_monsters = False  # Missing played this turn
         self.to_draw = 0  # monster tokens still to draw this turn
         self.pending = {}  # seat -> what that player must decide before play goes on ("discard1")
@@ -175,7 +184,7 @@ class Game:
 
     FIELDS = ("names", "hand_size", "max_discards", "max_trades", "cards", "deck", "discard_pile", "monsters",
               "next_mid", "walls", "fortified", "towers", "hands", "trophies", "monster_discard", "turn", "current",
-              "phase", "discards_used", "trades_used", "no_monsters", "to_draw", "pending", "trade_offer", "result",
+              "phase", "discards_used", "trades_used", "traded_with", "no_monsters", "to_draw", "pending", "trade_offer", "result",
               "pile")
 
     def to_dict(self, hide_pile=True):
@@ -289,15 +298,16 @@ class Game:
     def _begin_turn(self, first=False):
         self.turn += 1
         self.discards_used = self.trades_used = 0
+        self.traded_with = []
         self.no_monsters = False
         for m in self.monsters.values():  # Tar wears off at the start of the next player's turn
             if m["tar"]:
                 m["tar"] = False
                 self.events.append(Event("untar", mid=m["id"]))
+        self.phase = "draw_up"
         self.events.append(Event("turn", seat=self.current, turn=self.turn))
-        if not first:
+        if not first:  # (the first player's hand was just dealt)
             self._fill_hand(self.current)
-        self.phase = "discard"
 
     def _fill_hand(self, seat):
         while len(self.hands[seat]) < self.hand_size:
@@ -323,7 +333,7 @@ class Game:
         self.events.append(Event("discard", seat=seat, card=cid, why=why))
 
     def discard(self, seat, cid):
-        """Phase 2: throw one card away (two in a solo game) and draw a replacement."""
+        """Step 2: throw one card away (two in a solo game) and draw a replacement."""
         self._check(seat, ("discard",))
         if cid not in self.hands[seat]:
             raise IllegalMove("not in your hand")
@@ -332,27 +342,33 @@ class Game:
         self.discards_used += 1
         self._discard(seat, cid)
         self._draw_card(seat)
-        if self.discards_used >= self.max_discards:
-            self.phase = "trade" if self.max_trades else "play"
 
-    def skip(self, seat):
-        """Done with the discard phase, or the trade phase."""
-        self._check(seat, ("discard", "trade"))
-        if self.phase == "discard" and self.max_trades:
-            self.phase = "trade"
+    def next_step(self, seat):
+        """On to the next step of the turn. From Play the Monsters move; from Monsters Move 2 new Monsters are drawn,
+        and then the next player's turn begins (at Draw Up)."""
+        self._check(seat)
+        if self.phase in ("draw_up", "discard", "trade"):
+            self.phase = {"draw_up": "discard", "discard": "trade" if self.max_trades else "play",
+                          "trade": "play"}[self.phase]
+            self.events.append(Event("step", seat=seat, step=self.phase))
+        elif self.phase == "play":
+            self._monsters_move()
+        elif self.phase == "move":
+            self._draw_monsters()
         else:
-            self.phase = "play"
+            raise IllegalMove("wait for the Monsters")
 
     def offer_trade(self, seat, to, give, take):
-        """Phase 3: offer one of your cards for one of theirs; `to` accepts or declines (answer_trade)."""
-        self._check(seat, ("discard", "trade"))
+        """Step 3: offer one of your cards for one of theirs; `to` accepts or declines (answer_trade)."""
+        self._check(seat, ("trade",))
         if self.trades_used >= self.max_trades:
             raise IllegalMove("no more trades this turn")
         if to == seat or not 0 <= to < self.players:
             raise IllegalMove("trade with someone else")
+        if to in self.traded_with:
+            raise IllegalMove(f"you've traded with {self.names[to]} already: the second trade is with someone else")
         if give not in self.hands[seat] or take not in self.hands[to]:
             raise IllegalMove("those cards aren't there")
-        self.phase = "trade"
         self.trade_offer = {"from": seat, "to": to, "give": give, "take": take}
         self.events.append(Event("offer", **self.trade_offer))
 
@@ -368,9 +384,8 @@ class Game:
             self.hands[a].append(offer["take"])
             self.hands[b].append(offer["give"])
             self.trades_used += 1
+            self.traded_with.append(b)
             self.events.append(Event("trade", **offer))
-            if self.trades_used >= self.max_trades:
-                self.phase = "play"
         else:
             self.events.append(Event("declined", **offer))
 
@@ -382,11 +397,10 @@ class Game:
     # -------------------------------------------------------------------------------- playing cards
 
     def play(self, seat, cid, target=None, extra=None):
-        """Phase 4: play a card. target: a Monster id (hit cards, Barbarian, Tar, Drive Him Back!), a wall's arc
+        """Step 4: play a card. target: a Monster id (hit cards, Barbarian, Tar, Drive Him Back!), a wall's arc
         (Fortify, or Brick/Mortar with the other as `extra`), a discard-pile card id (Scavenge). Nice Shot is
         played with its hit card as `extra`."""
-        self._check(seat, ("discard", "trade", "play"))
-        self.phase = "play"
+        self._check(seat, ("play",))
         if cid not in self.hands[seat]:
             raise IllegalMove("not in your hand")
         card = self.cards[cid]
@@ -674,18 +688,27 @@ class Game:
         if not self.pending:
             self._run_monsters()
 
-    def end_turn(self, seat):
-        """Done playing cards: the Monsters move, new ones are drawn, and the next player's turn begins."""
-        self._check(seat)
-        self.phase = "monsters"
-        self.events.append(Event("monster_phase", seat=seat))
+    def _monsters_move(self):
+        """Step 5: every Monster moves one space in."""
+        self.phase = "move"
+        self.events.append(Event("monster_phase", seat=self.current))
         self._move(list(self.monsters.values()))
-        if self.phase == "over":
-            return
+
+    def _draw_monsters(self):
+        """Step 6: draw 2 Monster tokens (none if Missing was played), then the next player's turn begins."""
+        self.phase = "draw_monsters"
         self.to_draw = 0 if self.no_monsters else 2
+        self.events.append(Event("draw_monsters", seat=self.current, count=self.to_draw))
         if self.no_monsters:
             self.events.append(Event("no_draw"))
         self._run_monsters()
+
+    def end_turn(self, seat):
+        """Skip ahead through the steps that remain: the Monsters move, new ones are drawn, the next turn begins."""
+        self._check(seat)
+        turn = self.turn
+        while self.turn == turn and self.phase != "over" and not self.pending:
+            self.next_step(seat)
 
     def _run_monsters(self):
         while self.to_draw > 0 and self.pile and self.phase != "over":
@@ -726,13 +749,13 @@ class Game:
 
 
 def apply(game, seat, action):
-    """Carry out an action dict from a player (UI, bot or network): {"a": "discard"|"skip"|"offer"|"answer"|
+    """Carry out an action dict from a player (UI, bot or network): {"a": "next"|"discard"|"offer"|"answer"|
     "cancel"|"play"|"end"|"forced_discard", ...}. Raises IllegalMove if it isn't allowed."""
     a = action.get("a")
+    if a == "next":
+        return game.next_step(seat)
     if a == "discard":
         return game.discard(seat, action["card"])
-    if a == "skip":
-        return game.skip(seat)
     if a == "offer":
         return game.offer_trade(seat, action["to"], action["give"], action["take"])
     if a == "answer":

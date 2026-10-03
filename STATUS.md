@@ -3,12 +3,14 @@
 Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host / join -> game -> game over).
 
 ## Done
-- **Rules** (`rules.py`): the full standard game + solo variant; JSON state for the network. Tests: `tests/test_rules.py`
+- **Rules** (`rules.py`): the full standard game + solo variant; JSON state for the network. A turn is six steps
+  (`STEPS`), each moved on from with the `next` action: draw up, discard 1 (solo 2), trade 1 (6 players: 2, with
+  two different players), play, Monsters move, draw 2 Monsters. Tests: `tests/test_rules.py`
   (incl. 300 all-bot games checking cards/tokens are conserved), `tests/test_net.py` (lobby, start, chat, remote
   turns, out-of-turn errors, disconnect -> bot).
-- **Bots** (`bots.py`): one-move lookahead for hits/slays, rules of thumb for the rest. Win rate ~16% overall
-  (solo ~36%, 6 players ~2%): Castle Panic with these token counts is hard; room to improve (planning across
-  the team, smarter trades).
+- **Bots** (`bots.py`): one-move lookahead for hits/slays, rules of thumb for the rest; trades read the open hands
+  and play each candidate trade out on a copy of the board. Win rate ~39% overall (900 games; solo 33%, 2p 63%,
+  3p 31%, 4p 42%, 5p 45%, 6p 18%), up from ~16% before the trade rework. Room to improve: planning across the team.
 - **3D** (`scene.py`, `actors.py`, `fx.py`, `board.py`): painted mat + table, 36 forest props, 6 towers / walls /
   palisades, sentries fidgeting on the walls, every rules event animated (spawns walk in, defenders loose arrows or
   charge out, Hit/Die clips with blood, walls/towers collapse with dust and debris, the boulder rolls through and
@@ -25,7 +27,13 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
 - **On the board**: ring names (Arc/Kni/Swo) on the three lines where the colours change, placed so they never
   overlap each other or a Monster's label (a line shows whole or not at all; zoomed far out, only the nearest line).
   Monster tags (GK OW TM HL TR OR GO) before the health pips (`SHOW_TAGS` in ui.py to drop them). The camera eases
-  back to the whole board 1 s after the action ends. An END TURN button in the side panel.
+  back to the whole board 1 s after the action ends. An Order of play window (bottom right): the six
+  steps, the current one lit (following the animations, which run behind the state), and a NEXT STEP button.
+  Brick and Mortar are chosen one after the other. Each drawn Monster token is named in gilt lettering (after
+  "tHe mOnsTeRs aRe CoMing!"), then 0.5 s before it takes effect. Missing: "Missing! / No Monsters this turn / (whew!)" in gilt, with a relief
+  sound ("phew" + a suspended-to-major horn chord). Monsters sharing a space shrink (85% for two, 70% for three or
+  more); in a Castle space whose Tower has fallen they stand on the rubble. The Fortify palisade is 1.4x taller and
+  1.2x longer.
 - **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections on the menu's Settings
   screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
   shows only the frame rate (achieved/target, clickable).

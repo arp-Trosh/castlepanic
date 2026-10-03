@@ -109,9 +109,11 @@ class Banner:
         for i, line in enumerate(lines):
             x = -widths[i] / 2
             y = self.height / 2 - i * (rows + LINE_GAP) - rows / 2
-            for k, ch in enumerate(c for c in line if c in font):
+            initial = next((c for c in line if c.isalnum()), None)  # the line's first letter, past any "("
+            for ch in (c for c in line if c in font):
                 w = len(font[ch][0])
-                mesh = letter_mesh(style, ch, first=(k == 0))
+                mesh = letter_mesh(style, ch, first=ch == initial)
+                initial = None if ch == initial else initial
                 if mesh is not None:
                     obj = Object3D(mesh, color=(255, 255, 255), cast_shadows=False, specular=2.0 if style == "gilt"
                                    else 0.2, shininess=40, emissive=0.3)

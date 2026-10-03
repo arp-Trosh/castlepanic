@@ -1,0 +1,15 @@
+1) Rules Refinement
+    A) This is a co-operative game. Players can see each others hands at all times. This is what makes trading more powerful. Review the bot logic once implementing this - they should faire much better now.
+    B) Order of play should be :
+        1) Draw up
+        2) Discard and draw 1 card (Optional step; can pass)
+        3) Trade cards with another player (1 card with 1 other player) (in 6 player game this is expanded to 2 cards, so one card with one other player and another card with another player) (Optional step; can pass)
+        4) Play cards
+        5) Monsters Move
+        6) Draw 2 new monsters.
+    C) Refinement of visual cues for order of play:
+        1) In plaintext in the bottom menu area, add an "Order of play" window that displays the steps in a player's turn, and also shows which step they are currently on. For example "Step: Draw Up". Add a "Next step" button in this window for going to the next step. For example, a player draws up and gets new cards. To go to the discard step, they must click "Next Step".
+        2) Allow players to click/select both Brick & Mortar from hand to "Fortify" a wall.
+    D) In discard step, you can discard only one card from your hand, which is replaced by a new one.
+
+2) During the Draw 2 new monsters step, announce what has been drawn in the stylized 3d text and pause a half second.

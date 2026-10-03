@@ -29,6 +29,22 @@ DEFENDER_FOR = {"archer": "archer", "knight": "knight", "swordsman": "swordsman"
 BANNER_RGB = {"red": (170, 30, 24), "green": (40, 120, 40), "blue": (40, 70, 170)}
 TAR = blob_mesh((0.5, 0.06, 0.5))
 SPAWN_AFTER = 0.5  # seconds after "tHe mOnsTeRs aRe CoMing!" that they appear
+TOKEN_AFTER = 0.5  # seconds after a drawn Monster token is announced that it takes effect
+TOKEN_HOLD = 1.0  # seconds its name stays up
+# what each Monster token says as it is drawn, in gilt lettering (the font has no digits)
+TOKEN_BANNER = {
+    "goblin": ["A Goblin!"], "orc": ["An Orc!"], "troll": ["A Troll!"], "goblin_king": ["The Goblin King!"],
+    "orc_warlord": ["The Orc Warlord!"], "troll_mage": ["The Troll Mage!"], "healer": ["The Healer!"],
+    "boulder": ["A Giant Boulder!"],
+    "move_red": ["Red Monsters", "move one!"], "move_green": ["Green Monsters", "move one!"],
+    "move_blue": ["Blue Monsters", "move one!"], "move_cw": ["Monsters move", "clockwise!"],
+    "move_ccw": ["Monsters move", "counter-clockwise!"], "plague_archer": ["Plague!", "Archers"],
+    "plague_knight": ["Plague!", "Knights"], "plague_swordsman": ["Plague!", "Swordsmen"],
+    "discard1": ["All players", "discard a card!"], "draw3": ["Draw three", "more Monsters!"],
+    "draw4": ["Draw four", "more Monsters!"],
+}
+CROWD_SCALE = {1: 1.0, 2: 0.85}  # Monsters sharing a space shrink a little to fit (three or more: CROWDED)
+CROWDED = 0.7
 HOME_AFTER = 1.0  # seconds after the action ends that the camera eases back to the whole-board view
 
 
@@ -140,6 +156,8 @@ class BoardScene:
         self.aspect = 2.0  # the view's width over its height, in pixels (the UI keeps it up to date)
         self.my_seat = None  # whose "Your turn" banner to show
         self.announced = False  # "the Monsters are coming" shown since the last turn began
+        self.step = None  # (seat, step) of the turn as far as the animations have got
+        self.turn = None  # and that turn's number
         self.selected = None
 
     def _static(self, name, p, y, scale=1.0):
@@ -248,17 +266,20 @@ class BoardScene:
         self.tars.pop(mid, None)
 
     def _layout(self, animate=True, only=None, duration=0.9):
-        """Put every Monster in its slot (several share a space side by side)."""
+        """Put every Monster in its slot (several share a space side by side, smaller the more there are; in a
+        Castle space whose Tower has fallen, on the rubble)."""
         spaces = {}
         for mid in sorted(self.mdata):
             m = self.mdata[mid]
             spaces.setdefault((m["arc"], m["ring"]), []).append(mid)
         for (arc, ring), mids in spaces.items():
+            rubble = ring == CASTLE and getattr(self.towers[arc], "_state", None) == "Collapse"
             for k, mid in enumerate(mids):
                 a = self.monsters.get(mid)
                 if a is None or a.dead:
                     continue
-                p, y = board.space_position(arc, ring, k, len(mids))
+                a.holder.scale = SCALE.get(self.mdata[mid]["kind"], 1.5) * CROWD_SCALE.get(len(mids), CROWDED)
+                p, y = board.space_position(arc, ring, k, len(mids), rubble)
                 if not animate:
                     a.position = p
                     a.set_yaw(y)
@@ -374,7 +395,12 @@ class BoardScene:
         self.banner(["tHe mOnsTeRs", "aRe CoMing!"], "stone", then=after)
 
     # ---- turns and cards
+    def _ev_step(self, e):
+        self.step = (e["seat"], e["step"])
+
     def _ev_turn(self, e):
+        self.step = (e["seat"], "draw_up")
+        self.turn = e["turn"]
         self.on_sound("turn")
         self.rig.go_home()
         self.wait = 0.3
@@ -566,20 +592,36 @@ class BoardScene:
         self._sentries(g)
 
     def _ev_missing(self, e):
+        """Missing is played: no new Monsters this turn, and everyone breathes out."""
         self.on_sound("missing")
+        self.rig.go_home()
+        self.banner(["Missing!", "No Monsters this turn", "(whew!)"], "gilt", hold=1.6)
 
     def _ev_draw2(self, e):
         self.on_sound("card")
 
     # ---- monsters
     def _ev_monster_phase(self, e):
+        self.step = (e["seat"], "move")
         self.on_sound("monsters_move")
         self.rig.go_home()
         self.wait = 0.4
 
+    def _ev_draw_monsters(self, e):
+        self.step = (e["seat"], "draw_monsters")
+        self.rig.go_home()
+
     def _ev_token(self, e):
+        """A Monster token is drawn: its name in gilt lettering (after "tHe mOnsTeRs aRe CoMing!" for the turn's
+        first), then a pause before it takes effect."""
+        if not self.announced:
+            self._announce(e)
+            return
         self.on_sound("token", kind=e["kind"])
-        self.wait = 0.5
+
+        def after():
+            self.wait = TOKEN_AFTER
+        self.banner(TOKEN_BANNER.get(e["kind"], ["A Monster!"]), "gilt", then=after, hold=TOKEN_HOLD)
 
     def _ev_spawn(self, e):
         if e["mid"] in self.monsters:
@@ -671,7 +713,7 @@ class BoardScene:
                 for m in self.monsters.values():
                     if m.has("Roar") and not m.busy() and self.rng.random() < 0.5:
                         m.play("Roar")
-                self._after(1.8, done)
+                self._after(1.8, lambda: (self._layout(), done()))  # the attackers climb onto the rubble
             self.on_sound("monster_attack")
             if a:
                 a.play("Attack")

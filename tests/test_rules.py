@@ -135,6 +135,64 @@ class Rules(unittest.TestCase):
         with self.assertRaises(IllegalMove):
             apply(g, 0, {"a": "play", "card": g.hands[1][0]})
 
+    def test_steps_in_order(self):
+        g = Game(["a", "b"], seed=10)
+        self.assertEqual(g.phase, "draw_up")
+        hit = next(c for c in g.hands[0])
+        with self.assertRaises(IllegalMove):  # nothing is played before step 4
+            apply(g, 0, {"a": "play", "card": hit})
+        with self.assertRaises(IllegalMove):
+            apply(g, 0, {"a": "discard", "card": hit})
+        apply(g, 0, {"a": "next"})
+        self.assertEqual(g.phase, "discard")
+        apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
+        with self.assertRaises(IllegalMove):  # one discard
+            apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
+        self.assertEqual(len(g.hands[0]), 6)
+        apply(g, 0, {"a": "next"})
+        self.assertEqual(g.phase, "trade")
+        apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
+        apply(g, 1, {"a": "answer", "accept": True})
+        with self.assertRaises(IllegalMove):  # one trade
+            apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
+        apply(g, 0, {"a": "next"})
+        self.assertEqual(g.phase, "play")
+        rings = {m["id"]: m["ring"] for m in g.monsters.values()}
+        apply(g, 0, {"a": "next"})
+        self.assertEqual(g.phase, "move")
+        self.assertTrue(all(m["ring"] == rings[m["id"]] - 1 for m in g.monsters.values()))
+        pile = len(g.pile)
+        g.take_events()
+        apply(g, 0, {"a": "next"})
+        ev = [e["e"] for e in g.take_events()]
+        self.assertIn("draw_monsters", ev)
+        self.assertLess(len(g.pile), pile)
+        if not g.pending:
+            self.assertEqual((g.current, g.phase), (1, "draw_up"))
+
+    def test_solo_two_discards_no_trade(self):
+        g = Game(["solo"], seed=11)
+        apply(g, 0, {"a": "next"})
+        apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
+        apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
+        with self.assertRaises(IllegalMove):
+            apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
+        apply(g, 0, {"a": "next"})
+        self.assertEqual(g.phase, "play")
+
+    def test_six_players_trade_with_two(self):
+        g = Game(list("abcdef"), seed=12)
+        apply(g, 0, {"a": "next"})
+        apply(g, 0, {"a": "next"})
+        apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
+        apply(g, 1, {"a": "answer", "accept": True})
+        with self.assertRaises(IllegalMove):  # the second trade is with someone else
+            apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
+        apply(g, 0, {"a": "offer", "to": 2, "give": g.hands[0][0], "take": g.hands[2][0]})
+        apply(g, 2, {"a": "answer", "accept": True})
+        with self.assertRaises(IllegalMove):  # and that's all
+            apply(g, 0, {"a": "offer", "to": 3, "give": g.hands[0][0], "take": g.hands[3][0]})
+
     def test_json_round_trip(self):
         g = Game(["a", "b", "c"], seed=9)
         d = json.loads(json.dumps(g.to_dict(hide_pile=False)))

@@ -1,4 +1,5 @@
-"""Computer players: a greedy defender that plays whatever does the most good right now.
+"""Computer players: a greedy defender that plays whatever does the most good right now, and trades with open
+hands for the cards that let it.
 
 `next_action(game, seat)` returns the bot's next move as an action dict (the same shape a human's UI sends, see
 `session.apply_action`), or None when the bot has nothing to do. Bots also answer trades and forced discards.
@@ -110,35 +111,100 @@ def best_play(game, seat):
     return max(options, key=lambda o: o[0])[1]
 
 
+# a teammate's gain on their own turn, against the board's score now: games played out by bots win most at
+# 0-0.2 (39% of 900 games, 1-6 players; 32% at 0.5, 17% at 3), as what they'd do with it once the Monsters have
+# moved is a rougher guess than what playing it now does; so it mostly breaks ties
+LATER_WEIGHT = 0.1
+
+
+def _clone(game):
+    """A copy to try moves on: the real game is never touched."""
+    import copy
+    events, game.events = game.events, []
+    try:
+        return copy.deepcopy(game)
+    finally:
+        game.events = events
+
+
+def _advanced(game):
+    """The board once the Monsters have moved: where a teammate, playing later, will find them."""
+    g = _clone(game)
+    g._move(list(g.monsters.values()))
+    return g
+
+
+def _plan_score(game, seat, trade=None):
+    """How the board stands after this seat plays everything worth playing (having made `trade` first) and the
+    Monsters move."""
+    g = _clone(game)
+    if trade:
+        frm, to, give, take = trade
+        g.hands[frm].remove(give)
+        g.hands[to].remove(take)
+        g.hands[frm].append(take)
+        g.hands[to].append(give)
+    g.phase, g.trade_offer, g.pending = "play", None, {}
+    for _ in range(8):
+        act = best_play(g, seat)
+        if not act:
+            break
+        try:
+            g.play(seat, act["card"], act.get("target"), act.get("extra"))
+        except Exception:
+            break
+        if g.phase == "over":
+            break
+    return _evaluate(g)
+
+
+def _later_gain(later, card_in, card_out, seat):
+    """What a teammate gains for their own turn by taking card_in for card_out (on the board as it will be)."""
+    return card_value(later, card_in, seat) - card_value(later, card_out, seat)
+
+
 def trade_wish(game, seat):
-    """A trade worth offering: something a teammate holds that hits a Monster we can't, for our weakest card."""
+    """The trade that does the team most good, or None. All hands are open, so the active player weighs both sides:
+    what the card it takes lets it do now (played out on a copy of the board), and what the card it gives is worth
+    to the teammate on their own turn, once the Monsters have moved."""
     if game.trades_used >= game.max_trades or game.players < 2:
         return None
     mine = game.hand(seat)
     if not mine:
         return None
-    ms = sorted(game.monsters.values(), key=threat, reverse=True)
-    for m in ms[:4]:
-        if any(c["kind"] in HIT_KINDS and game.can_hit(c, m) for c in mine):
+    later = _advanced(game)
+    # rough first pass: cards worth taking (useful to me now) and giving (little use to me, more to them)
+    rough = []
+    for other in range(game.players):
+        if other == seat or other in game.traded_with:
             continue
-        for other in range(game.players):
-            if other == seat:
-                continue
-            for c in game.hand(other):
-                if c["kind"] in HIT_KINDS and game.can_hit(c, m) or c["kind"] == "barbarian":
-                    give = min(mine, key=lambda x: card_value(game, x, seat))
-                    if card_value(game, give, seat) < card_value(game, c, seat):
-                        return dict(a="offer", to=other, give=give["id"], take=c["id"])
-    return None
+        for take in game.hand(other):
+            gain_now = card_value(game, take, seat) - card_value(game, take, other)
+            for give in mine:
+                if give["kind"] == take["kind"] and give["color"] == take["color"]:
+                    continue
+                score = gain_now - card_value(game, give, seat) + _later_gain(later, give, take, other)
+                rough.append((score, other, give["id"], take["id"]))
+    rough.sort(reverse=True)
+    base = _plan_score(game, seat)
+    best = None
+    for _, other, give, take in rough[:8]:
+        now = _plan_score(game, seat, (seat, other, give, take)) - base
+        team = now + LATER_WEIGHT * _later_gain(later, game.cards[give], game.cards[take], other)
+        if team > 1.0 and (best is None or team > best[0]):
+            best = (team, other, give, take)
+    if best is None:
+        return None
+    return dict(a="offer", to=best[1], give=best[2], take=best[3])
 
 
 def accept_trade(game, seat):
-    """Bots are good team players: they accept unless it costs them a card they're about to use."""
+    """Bots are team players: they take any trade that doesn't cost the team more than it gains."""
     o = game.trade_offer
-    give = game.cards[o["take"]]  # what this bot gives up
-    if give["kind"] == "barbarian" and seat != o["from"]:
-        return True
-    return card_value(game, give, seat) < 12
+    give, take = game.cards[o["take"]], game.cards[o["give"]]  # what this bot gives up, and gets
+    now = card_value(game, give, o["from"]) - card_value(game, take, o["from"])
+    later = _later_gain(_advanced(game), take, give, seat)
+    return now + later > -1.0
 
 
 def next_action(game, seat, offered=None):
@@ -155,19 +221,22 @@ def next_action(game, seat, offered=None):
         return None
     if game.phase == "discard":
         worst = worst_card(game, seat)
-        if worst is not None and card_value(game, game.cards[worst], seat) < 3:
+        if game.discards_used < game.max_discards and worst is not None and \
+                card_value(game, game.cards[worst], seat) < 3:
             return dict(a="discard", card=worst)
-        return dict(a="skip")
+        return dict(a="next")
     if game.phase == "trade":
         wish = trade_wish(game, seat)
         if wish and (offered is None or (wish["give"], wish["take"]) not in offered):
             if offered is not None:
                 offered.add((wish["give"], wish["take"]))
             return wish
-        return dict(a="skip")
+        return dict(a="next")
     if game.phase == "play":
         play = best_play(game, seat)
-        return play or dict(a="end")
+        return play or dict(a="next")
+    if game.phase in ("draw_up", "move"):
+        return dict(a="next")
     return None
 
 

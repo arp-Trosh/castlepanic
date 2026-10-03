@@ -64,13 +64,17 @@ def slot_offsets(n):
     return out
 
 
-def space_position(arc, ring, k=0, n=1):
-    """Where the k-th of n Monsters in (arc, ring) stands, in the world, and the yaw facing the castle."""
+RUBBLE_MID = 1.55  # where Monsters stand in a Castle space once its Tower has fallen: on the rubble
+
+
+def space_position(arc, ring, k=0, n=1, rubble=False):
+    """Where the k-th of n Monsters in (arc, ring) stands, in the world, and the yaw facing the castle. rubble: a
+    Castle space whose Tower has fallen, so its footprint is free to stand on (more room than beside a Tower)."""
     frac, dr = slot_offsets(n)[k]
     if ring == CASTLE:
-        frac = 0.5 + (frac - 0.5) * 0.7
+        frac = 0.5 + (frac - 0.5) * (0.9 if rubble else 0.7)
     deg = arc_angle(arc, frac)
-    pos = polar(deg, ring_mid(ring) + dr)
+    pos = polar(deg, (RUBBLE_MID if ring == CASTLE and rubble else ring_mid(ring)) + dr)
     return pos, facing_yaw(deg)
 
 

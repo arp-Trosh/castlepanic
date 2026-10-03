@@ -69,6 +69,8 @@ def describe(e, game, names):
         return f"{who} scavenges {card(e['card'])}"
     if k == "monster_phase":
         return "The Monsters advance..."
+    if k == "draw_monsters" and e.get("count"):
+        return "New Monsters are drawn..."
     if k == "token":
         return f"Monster token: {TOKEN_TITLES.get(e['kind'], e['kind'])}"
     if k == "spawn" and e["ring"] == 4:

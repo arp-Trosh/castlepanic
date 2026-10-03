@@ -9,7 +9,8 @@ Everything works by keyboard and most things by mouse too. The game screen:
     |                                          |----------------|
     |                                          | log            |
     +------------------------------------------+----------------+
-    | your hand: card boxes, what to do next                     |
+    | your hand: card boxes, what to do next   | order of play,  |
+    |                                          | [NEXT STEP]     |
     | (multiplayer) chat                                          |
     | keys help                                         frame rate |
 
@@ -29,8 +30,8 @@ from unicode3d.ui import DisplayControls
 from . import board, settings
 from .narrate import describe
 from .net import DEFAULT_PORT, local_ip
-from .rules import (ARCHER, ARCS, CARD_HELP, CASTLE, FOREST, HIT_RING, KNIGHT, RING_NAMES, SWORDSMAN, IllegalMove,
-                    arc_color, card_title)
+from .rules import (ARCHER, ARCS, CARD_HELP, CASTLE, FOREST, HIT_RING, KNIGHT, RING_NAMES, STEP_TITLES, STEPS,
+                    SWORDSMAN, IllegalMove, arc_color, card_title)
 from .scene import BoardScene
 from .session import MAX_NAME, ClientSession, HostSession, single_player
 from .sound import Sound
@@ -39,8 +40,8 @@ CARD_COLOR = {"red": Color.RED, "green": Color.GREEN, "blue": Color.BLUE, "any":
 SHORT = {"archer": "Arc", "knight": "Kni", "swordsman": "Swd", "hero": "Her", "barbarian": "Bar", "brick": "Brk",
          "mortar": "Mor", "nice_shot": "Nic", "tar": "Tar", "fortify": "For", "drive_back": "Drv", "missing": "Mis",
          "draw2": "Dr2", "scavenge": "Scv"}
-PHASE_TEXT = {"discard": "Discard & draw (optional)", "trade": "Trade (optional)", "play": "Play cards",
-              "monsters": "Monsters move", "over": "Game over"}
+ORDER_W = 41  # the Order of play window's width (ORDER_NARROW when the terminal is narrow)
+ORDER_NARROW = 24
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 HP_PIP = "●"
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
@@ -66,15 +67,17 @@ HELP = [
     "Monsters march from the Forest ring through the Archer, Knight and Swordsman rings",
     "to the Castle. Defend the 6 Towers together; survive all 49 Monster tokens to win.",
     "",
-    "Your turn: 1 draw up  2 discard & draw 1 (X; solo: 2)  3 trade 1 card (T)",
-    "           4 play cards  5 the Monsters move (E)  6 two new Monsters come",
+    "Your turn, a step at a time (N, Enter or NEXT STEP moves on):",
+    "  1 draw up  2 discard & draw 1 (click a card twice; solo: 2)  3 trade 1 card",
+    "  (6 players: 2, with two players)  4 play cards  5 the Monsters move  6 draw 2 Monsters",
+    "All hands are open: it's a co-operative game, so trade for what you need.",
     "",
     "To hit a Monster the card must match its ring AND colour (red 1-2, green 3-4, blue 5-6).",
     "  Archer / Knight / Swordsman: that ring.  Any Colour: that ring, any colour.",
     "  Hero: Archer, Knight or Swordsman ring of its colour.  Nothing hits in the Forest.",
     "  Barbarian: slay any Monster outside the Forest (Castle too).  Nice Shot + hit: slain.",
     "  Tar: hold a Monster this turn.  Drive Him Back!: back to the Forest.",
-    "  Brick + Mortar: rebuild a Wall.  Fortify: a Wall survives one attack.",
+    "  Brick + Mortar (choose both): rebuild a Wall.  Fortify: a Wall survives one attack.",
     "  Missing: no new Monsters.  Draw 2 / Scavenge: more cards.",
     "",
     "A Monster at a Wall smashes it and takes 1 damage; in the Castle it smashes Towers",
@@ -131,7 +134,7 @@ class App:
         self.quit_armed = 0.0
         self.view = (0, 0, 1, 1)  # top, left, width, height of the 3D view
         self.hand_boxes = []  # (x0, y0, x1, y1, card id)
-        self.end_box = (-1, -1, -1, -1)  # the End Turn button: x0, y0, x1, y1
+        self.next_box = (-1, -1, -1, -1)  # the Next Step button: x0, y0, x1, y1
         self.click_zones = []  # (x0, y0, x1, y1, callback)
         self._demo()
         self.last_sync = 0.0
@@ -488,7 +491,7 @@ class App:
         self.ui = {"mode": None}
         self.log = []
         events = [e for e in events if e.get("e") != "_sync"]
-        if not (g and g.turn == 1 and g.phase == "discard"):  # (not a fresh game: just catch up)
+        if not (g and g.turn == 1 and g.phase == "draw_up"):  # (not a fresh game: just catch up)
             if g:
                 self.scene.sync(g)
             self._feed(events)
@@ -542,11 +545,13 @@ class App:
         if not self.scene.banners:
             self._labels(screen)
         self._status(screen, cols)
-        self._side(screen, 1, view_w, side, view_h + hand_h)
-        self._hand(screen, 1 + view_h, 0, view_w, hand_h)
+        self._side(screen, 1, view_w, side, view_h)
+        order_w = ORDER_W if cols >= 110 else ORDER_NARROW
+        self._hand(screen, 1 + view_h, 0, cols - order_w, hand_h)
+        self._order(screen, 1 + view_h, cols - order_w, order_w, hand_h)
         if chat_h:
             self._draw_chat(screen, rows - 1 - chat_h, 0, cols, chat_h)
-        help_ = "1-9 card  X discard  T trade  E end turn  arrows/+/- camera  R view  H help  M sound  Q quit"
+        help_ = "1-9 card  N/Enter next step  X discard  T trade  arrows/+/- camera  R view  H help  M sound  Q quit"
         if s.networked:
             help_ += "  Tab chat"
         screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
@@ -571,11 +576,21 @@ class App:
         return True
 
     # ---- drawing
+    def _shown(self):
+        """(seat, step, turn) as shown: the animations' while they run (the state is ahead of them: once the new
+        Monsters are drawn it is already the next player's turn), else the game's."""
+        g = self.session.game
+        if self.scene.busy() and self.scene.step and self.scene.turn and g.phase != "over":
+            return (*self.scene.step, self.scene.turn)
+        return g.current, g.phase, g.turn
+
     def _status(self, screen, cols):
         g, s = self.session.game, self.session
-        who = s.names[g.current]
-        mine = g.current == s.my_seat
-        txt = f" Turn {g.turn}  {who}{' (you)' if mine else ''}: {PHASE_TEXT.get(g.phase, g.phase)}"
+        seat, phase, turn = self._shown()
+        who = s.names[seat]
+        mine = seat == s.my_seat
+        step = f"Step {STEPS.index(phase) + 1}: " if phase in STEPS else ""
+        txt = f" Turn {turn}  {who}{' (you)' if mine else ''}: {step}{STEP_TITLES.get(phase, phase)}"
         screen.text(0, 0, " " * cols, Color.WHITE, reverse=True)
         screen.text(0, 0, txt, Color.YELLOW if mine else Color.WHITE, reverse=True, bold=mine)
         towers = "".join("♖" if t else "." for t in g.towers) if screen.unicode else \
@@ -670,8 +685,6 @@ class App:
             screen.text(yy, x, "│" if screen.unicode else "|", Color.WHITE, dim=True)
         x += 2
         width -= 3
-        self._end_button(screen, top + height - 3, x, width)
-        height -= 4
         y = top
         screen.text(y, x, "Defenders", Color.CYAN, bold=True)
         y += 1
@@ -721,21 +734,55 @@ class App:
                 screen.text(y, x, t, col)
                 y += 1
 
-    def _end_button(self, screen, top, x, width):
-        """A button to end the turn (as E does), lit while that's yours to do."""
+    def next_live(self):
+        """Whether the Next Step button is mine to press now."""
         s, g = self.session, self.session.game
-        live = g.current == s.my_seat and g.phase in ("discard", "trade", "play") and not self.scene.busy()
-        w = min(width, 24)
-        x += (width - w) // 2
+        return (g.current == s.my_seat and g.phase in STEPS and g.phase != "draw_monsters" and not g.pending
+                and not g.trade_offer and not self.scene.busy())
+
+    def _order(self, screen, top, x, width, height):
+        """The Order of play: the six steps of a turn, the one we're on lit, and the button to go on to the next."""
+        g = self.session.game
+        _, phase, _ = self._shown()
+        bar = "─" if screen.unicode else "-"
+        screen.text(top, x, bar * width, Color.WHITE, dim=True)
+        screen.text(top, x + 2, " Order of play ", Color.CYAN, bold=True)
+        for yy in range(top + 1, top + height):
+            screen.text(yy, x, "│" if screen.unicode else "|", Color.WHITE, dim=True)
+        x += 2
+        width -= 3
+        now = STEPS.index(phase) if phase in STEPS else len(STEPS)
+        title = STEP_TITLES.get(phase, phase)
+        screen.text(top + 1, x, f"Step: {title}"[:width], Color.YELLOW, bold=True)
+        mark = "▶" if screen.unicode else ">"
+        if width >= 36:  # all six steps, in two columns
+            for i, step in enumerate(STEPS):
+                col, row = divmod(i, 3)
+                label = f"{mark if i == now else ' '}{i + 1} {STEP_TITLES[step]}"
+                skipped = step == "trade" and not g.max_trades
+                screen.text(top + 2 + row, x + col * 20, label, Color.YELLOW if i == now else Color.WHITE,
+                            bold=i == now, reverse=i == now, dim=i < now or skipped)
+        else:  # narrow: where we are and what comes next
+            screen.text(top + 2, x, f"Step {min(now + 1, 6)} of 6"[:width], Color.WHITE)
+            if now < len(STEPS) - 1:
+                screen.text(top + 3, x, f"then: {STEP_TITLES[STEPS[now + 1]]}"[:width], Color.WHITE, dim=True)
+        live = self.next_live()
+        nxt = STEPS[now + 1] if now < len(STEPS) - 1 else None
+        if phase == "trade" or (phase == "discard" and not g.max_trades):
+            nxt = "play"
+        label = "NEXT STEP"
+        if nxt and width >= 30:
+            label += f": {STEP_TITLES[nxt]}"
+        w = min(width, max(24, len(label) + 4))
         tl, tr, bl, br, hz, vt = "╭╮╰╯─│" if screen.unicode else "++++-|"
-        label = "END TURN".center(w - 2)
         col = Color.YELLOW if live else Color.WHITE
-        screen.text(top, x, tl + hz * (w - 2) + tr, col, dim=not live)
-        screen.text(top + 1, x, vt, col, dim=not live)
-        screen.text(top + 1, x + 1, label, col, bold=live, dim=not live, reverse=live)
-        screen.text(top + 1, x + w - 1, vt, col, dim=not live)
-        screen.text(top + 2, x, bl + hz * (w - 2) + br, col, dim=not live)
-        self.end_box = (x, top, x + w - 1, top + 2)
+        y = top + height - 3
+        screen.text(y, x, tl + hz * (w - 2) + tr, col, dim=not live)
+        screen.text(y + 1, x, vt, col, dim=not live)
+        screen.text(y + 1, x + 1, label.center(w - 2)[:w - 2], col, bold=live, dim=not live, reverse=live)
+        screen.text(y + 1, x + w - 1, vt, col, dim=not live)
+        screen.text(y + 2, x, bl + hz * (w - 2) + br, col, dim=not live)
+        self.next_box = (x, y, x + w - 1, y + 2)
 
     def _hand(self, screen, top, left, width, height):
         s, g = self.session, self.session.game
@@ -755,7 +802,9 @@ class App:
                 break
             col = card_color(c)
             chosen = sel == c["id"] or c["id"] in self.ui.get("chosen", ())
-            ok = g.playable(me, c["id"]) or (g.phase == "discard" and g.current == me)
+            ok = g.playable(me, c["id"]) or (g.current == me and (
+                g.phase == "discard" and g.discards_used < g.max_discards or
+                g.phase == "trade" and g.trades_used < g.max_trades))
             dim = not ok and not chosen
             title = CARD_TITLE_SHORT(c)
             ring = ""
@@ -792,7 +841,9 @@ class App:
         if g.pending.get(me) == "discard1":
             return "All players discard 1 card: press its number"
         if g.trade_offer and g.trade_offer["to"] == me:
-            return "A trade is offered to you: Y accept, N decline"
+            o = g.trade_offer
+            return (f"{s.names[o['from']]} offers {card_title(g.cards[o['give']])} for your "
+                    f"{card_title(g.cards[o['take']])}: Y accept, N decline")
         if mode == "target":
             return "Choose a Monster: its letter or click it (Esc cancels)"
         if mode == "wall":
@@ -802,7 +853,9 @@ class App:
         if mode == "scavenge":
             return "Scavenge: choose a card from the discard pile (letter, Esc cancels)"
         if mode == "discard":
-            return "Discard which card? (number, Esc cancels)"
+            return f"Discard {card_title(g.cards[ui['card']])} and draw a new card? Click it again or X (Esc cancels)"
+        if mode == "pair":
+            return f"{card_title(g.cards[ui['card']])}: now choose a {ui['need'].capitalize()} to go with it (Esc cancels)"
         if mode == "trade_give":
             return "Trade: which of your cards do you give? (number, Esc cancels)"
         if mode == "trade_partner":
@@ -817,11 +870,23 @@ class App:
             return "..."
         if g.current != me:
             return f"{s.names[g.current]} is defending..."
+        if self.scene.busy():
+            return "..."
+        if g.phase == "draw_up":
+            return "Your turn! Your hand is drawn up. Next Step to discard"
         if g.phase == "discard":
-            return "Your turn! X discard & draw, T trade, a card number to play it, E end turn"
+            if g.discards_used >= g.max_discards:
+                return "Discarded. Next Step to " + ("trade" if g.max_trades else "play cards")
+            return "Discard a card and draw a new one: click it (optional), or Next Step to pass"
         if g.phase == "trade":
-            return "T trade, a card number to play it, E end turn"
-        return "Play cards (number), or E to end your turn and let the Monsters move"
+            if g.trades_used >= g.max_trades:
+                return "Traded. Next Step to play cards"
+            return "Trade: click a card of yours to give (optional), or Next Step to pass"
+        if g.phase == "play":
+            return "Play cards (click or number), then Next Step: the Monsters move"
+        if g.phase == "move":
+            return "The Monsters have moved. Next Step: draw 2 new Monsters"
+        return "..."
 
     def _help(self, screen, rows, cols):
         w = max(len(t) for t in HELP) + 4
@@ -859,10 +924,10 @@ class App:
             return
         if not (ev.pressed and ev.button == MouseEvent.LEFT) or ev.moved:
             return
-        x0, y0, x1, y1 = self.end_box
+        x0, y0, x1, y1 = self.next_box
         if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
             if self.session.game.current == self.session.my_seat:
-                self._key(ord("e"))
+                self._next()
             return
         for x0, y0, x1, y1, cid in self.hand_boxes:
             if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
@@ -961,22 +1026,29 @@ class App:
             return
         if ch == "x":
             if g.phase != "discard":
-                self.flash("You can only discard at the start of your turn")
+                self.flash("Discarding is step 2, after drawing up")
+            elif mode == "discard":
+                self._send({"a": "discard", "card": ui["card"]})
+                self._reset_ui()
             else:
-                self.ui = {"mode": "discard"}
+                self.flash("Click (or number) the card to discard")
         elif ch == "t":
             if g.players < 2:
                 self.flash("No one to trade with in a solo game")
-            elif g.phase not in ("discard", "trade"):
-                self.flash("Trading comes before playing cards")
+            elif g.phase != "trade":
+                self.flash("Trading is step 3, after discarding")
             else:
                 self.ui = {"mode": "trade_give"}
-        elif ch == "e" or k == Key.ENTER and not mode:
-            if self.scene.busy():
-                self.flash("Wait for the action to finish")
-            else:
-                self._reset_ui()
-                self._send({"a": "end"})
+        elif ch == "n" or k == Key.ENTER and not mode:
+            self._next()
+
+    def _next(self):
+        """On to the next step of the turn (the NEXT STEP button, N or Enter)."""
+        if self.scene.busy():
+            self.flash("Wait for the action to finish")
+        elif self.next_live():
+            self._reset_ui()
+            self._send({"a": "next"})
 
     def _card_key(self, i):
         s, g, ui = self.session, self.session.game, self.ui
@@ -986,11 +1058,24 @@ class App:
             return
         cid = hand[i]
         mode = ui.get("mode")
-        if mode == "discard":
+        if mode == "discard" and ui["card"] == cid:
             self._send({"a": "discard", "card": cid})
             self._reset_ui()
             return
-        if mode == "trade_give":
+        if mode == "pair":
+            kind = g.cards[cid]["kind"]
+            if cid == ui["card"]:
+                self._reset_ui()
+            elif kind == ui["need"]:
+                brick, mortar = (ui["card"], cid) if kind == "mortar" else (cid, ui["card"])
+                arcs = [a for a in range(ARCS) if not g.walls[a]]
+                self.ui = {"mode": "wall", "arcs": arcs, "action": {"a": "play", "card": brick, "extra": mortar},
+                           "chosen": [brick, mortar], "card": ui["card"]}
+            else:
+                self.flash(f"Choose a {ui['need'].capitalize()} to go with it (Esc cancels)")
+            return
+        if mode in ("trade_give", "trade_partner", "trade_take") or (mode is None and g.current == me and g.phase == "trade" and
+                                    g.trades_used < g.max_trades and not g.trade_offer):
             self.ui = {"mode": "trade_partner", "give": cid, "chosen": [cid]}
             return
         if mode == "nice":
@@ -1012,17 +1097,26 @@ class App:
             return
         c = g.cards[cid]
         kind = c["kind"]
+        if g.phase == "discard":
+            if g.discards_used >= g.max_discards:
+                self.ui = {"mode": None, "card": cid}
+                self.flash("No more discards this turn: Next Step to go on")
+            else:
+                self.ui = {"mode": "discard", "card": cid, "chosen": [cid]}
+            return
+        if g.phase != "play":
+            self.ui = {"mode": None, "card": cid}
+            if g.phase in ("draw_up", "trade"):
+                self.flash("Cards are played in step 4: Next Step to go on")
+            return
         if not g.playable(me, cid):
             self.ui = {"mode": None, "card": cid}
             self.flash(f"{card_title(c)} can't be played now")
             return
         if kind in ("archer", "knight", "swordsman", "hero", "barbarian", "tar", "drive_back"):
             self._target_mode({"a": "play", "card": cid}, g.targets(cid), chosen=[cid])
-        elif kind in ("brick", "mortar"):
-            other = next(x for x in hand if g.cards[x]["kind"] == ("mortar" if kind == "brick" else "brick"))
-            arcs = [a for a in range(ARCS) if not g.walls[a]]
-            self.ui = {"mode": "wall", "arcs": arcs, "action": {"a": "play", "card": cid, "extra": other},
-                       "chosen": [cid, other], "card": cid}
+        elif kind in ("brick", "mortar"):  # choose the other half too, then the Wall
+            self.ui = {"mode": "pair", "card": cid, "chosen": [cid], "need": "mortar" if kind == "brick" else "brick"}
         elif kind == "fortify":
             arcs = [a for a in range(ARCS) if g.walls[a] and not g.fortified[a]]
             self.ui = {"mode": "wall", "arcs": arcs, "action": {"a": "play", "card": cid}, "chosen": [cid],

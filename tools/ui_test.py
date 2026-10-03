@@ -29,6 +29,10 @@ def main():
     run(30, [])
     shot(screen, "assets/previews/ui_game0.png")
     g = app.session.game
+    run(1, [ord("n")]); run(3, [])  # draw up -> discard
+    run(1, [ord("1")]); run(3, [])
+    shot(screen, "assets/previews/ui_discard.png")
+    run(1, [Key.ESC]); run(1, [ord("n")]); run(3, [])  # (solo: no trade) -> play
     # try to play the first playable hit card on its first target
     for i, cid in enumerate(g.hands[0]):
         if g.playable(0, cid) and g.cards[cid]["kind"] in ("archer", "knight", "swordsman", "hero"):
@@ -37,11 +41,20 @@ def main():
             run(1, [ord("a")]); run(60, [])
             shot(screen, "assets/previews/ui_attack.png")
             break
-    run(1, [ord("e")])
+    while app.scene.busy():
+        run(1, [])
+    run(1, [ord("n")])  # play -> the Monsters move
+    for k in range(60):
+        run(1, [])
+    shot(screen, "assets/previews/ui_monsters.png")
+    while app.scene.busy():
+        run(1, [])
+    shot(screen, "assets/previews/ui_move_done.png")
+    run(1, [ord("n")])  # -> draw 2 Monsters: "tHe mOnsTeRs aRe CoMing!", then each token's name
     t = time.time()
     for k in range(400):
         run(1, [])
-        if k == 60: shot(screen, "assets/previews/ui_monsters.png")
+        if k in (70, 130): shot(screen, f"assets/previews/ui_draw{k}.png")
     print("400 frames", round(time.time() - t, 1), "s; turn", app.session.game.turn, "log tail:")
     for line in app.session.log[-8:]: print("  ", line[0])
 main()

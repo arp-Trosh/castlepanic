@@ -1,0 +1,19 @@
+Please confirm that Castle Panic gameplay is compliant with the below rules:
+
+Drawing at the beginning of a turn fills a player's card to maximum hand size.
+
+Double check logic for when 2 monsters reach wall at the same time.
+When this happens, player whose turn it is chooses which monster will take the damage from the wall. Walls stop all movement, so the second monster in the same spot will not do anything.
+
+On the following turn, both monsters will move into the same tower space. 
+Visually, this could get crowded. Suggest some ideas and run them by me.
+
+When there are 2 monsters on a tower space at the same time, and they begin moving through the tower spaces, the rule is the same as when there were 2 moving into a wall. Player whose turn it is picks one moster to take the damage, the tower is destroyed. Unlike walls, destroying towers does not stop movement. All monsters sharing the tower space move to the next space together.
+
+NEW VISUAL CUE: When missing card is played, show in 3d stylized text: "Missing! No monsters this turn (whew!)". Generate an audio file to play when this happens in the same style as existing audio files. Make it a relief sound.
+
+Fortify Wall visuals: Make the wood fence/fortification a little taller/longer to help visibility. 
+
+
+
+

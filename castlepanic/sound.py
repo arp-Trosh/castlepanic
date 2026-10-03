@@ -16,7 +16,7 @@ import numpy as np
 from numba import njit
 
 RATE = 22050
-VERSION = 3
+VERSION = 4  # (bump when a sound changes: they are made once and cached)
 
 
 def _t(dur):
@@ -226,8 +226,18 @@ def make_sounds():
     S["march"] = _norm(_mix((drum(), 0), (drum(), 0.32), (drum(0.35, 62), 0.64), (drum(0.5, 55), 0.96)), 0.8)
     S["monsters_move"] = S["march"]
     S["card"] = _norm(_bandpass(_noise(rng, 0.07), 5000, 1.5) * _env(int(0.07 * RATE), 0.002, 0.06), 0.4)
-    t = _t(0.6)
-    S["missing"] = _norm(_sine(1400 - 900 * t / 0.6, 0.6) * _env(len(t), 0.02, 0.2), 0.4)
+    # Missing, the relief: a breathy "phew" (a puff, then a falling, sighing "ew"), and a soft horn chord that
+    # resolves, suspended fourth to major (the war horn's answer)
+    puff = _bandpass(_noise(rng, 0.09), 1300, 1.5) * _env(int(0.09 * RATE), 0.005, 0.06)
+    t = _t(0.75)
+    sigh = _voice(230 - 90 * t / 0.75, "u", 0.75, 1.6, rng, q=3) * _env(len(t), 0.04, 0.45)
+
+    def chord(freqs, d, attack):
+        t = _t(d)
+        x = sum(_saw(f * (1 + 0.004 * np.sin(2 * np.pi * 5 * t)), d) for f in freqs)
+        return _lowpass(x, 700) * _env(len(t), attack, d * 0.5)
+    resolve = _mix((chord([196, 262, 294], 0.55, 0.15), 0), (chord([196, 247, 294], 1.4, 0.05), 0.5))
+    S["missing"] = _norm(_mix((puff * 0.8, 0), (sigh, 0.06), (_norm(resolve, 0.35), 0.75)), 0.7)
     # the siege begins: a long horn call over a rolling war drum
     call = horn([(147, 0.3), (147, 0.18), (196, 0.3), (220, 0.3), (294, 1.4)], 2.4)
     roll = [(drum(0.4, 60 if k % 4 else 50), 0.25 * k) for k in range(12)]
