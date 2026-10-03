@@ -1,28 +1,13 @@
 """Drive the App off-screen with scripted keys and save screenshots: python tools/ui_test.py"""
 import sys, os, time
-import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from unicode3d.terminal import Screen
 from unicode3d.keys import Key
 from castlepanic.ui import App
-from castlepanic.snap import terminal_picture, CELL
 
 def shot(screen, path):
-    img = Image.fromarray(terminal_picture(screen))
-    d = ImageDraw.Draw(img)
-    rows, cols = screen.chars.shape
-    from castlepanic.snap import _unpack, TERMINAL_FG
-    from unicode3d.glyphs import GLYPH_SETS
-    blocks = set(GLYPH_SETS["sextant"].chars)
-    fg = _unpack(screen.fg, TERMINAL_FG)
-    for y in range(rows):
-        for x in range(cols):
-            c = screen.chars[y, x]
-            if c != " " and c not in blocks:
-                d.rectangle([x * 8, y * 16, x * 8 + 7, y * 16 + 15], fill=(12, 12, 16) if not screen.attrs[y, x] & 4 else tuple(int(v) for v in fg[y, x]))
-                d.text((x * 8, y * 16 + 2), c, fill=tuple(int(v) for v in fg[y, x]) if not screen.attrs[y, x] & 4 else (12, 12, 16))
-    img.save(path)
+    Image.fromarray(screen.picture()).save(path)
 
 def main():
     rows, cols = int(os.environ.get("ROWS", 50)), int(os.environ.get("COLS", 170))

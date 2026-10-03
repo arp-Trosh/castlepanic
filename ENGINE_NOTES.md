@@ -33,3 +33,12 @@
 - **`DisplayControls` is all or nothing.** The game wanted only the frame rate on screen and the rest on a settings
   page, so it keeps an undrawn `DisplayControls` for the widgets and F-keys and writes the fps itself. An fps-only
   readout widget and a load/save of display settings (they are the same for every game) would be welcome.
+
+## unicode3d 0.10.0 (moving the game onto it, 2026-10-03)
+
+- **Built since 0.9.0 and now used:** `Model.copy()` (Library.instance), `Model.bake()` (Static), `Clip.start(fade)`
+  (Actor's crossfades), `Screen.picture()` (snap.py and tools). Frame times in STATUS.md.
+- **Playing clips costs ~0.6 ms per animated model per frame**, all Python (`Clip.update` -> `Animation.apply` ->
+  each track's keyframe search and lerp/slerp, per node). 11 animated models: 6-7 ms of a 30 ms frame.
+- **`Screen.picture()` draws box-drawing characters as empty boxes**: Pillow's default font has none, so every
+  panel border and button in the screenshots is a row of tofu.

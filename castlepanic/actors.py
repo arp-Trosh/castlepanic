@@ -1,8 +1,7 @@
 """Animated pieces: a library that loads each model once and makes cheap copies of it (meshes shared, each copy with
-its own nodes and clip clocks), and Actor, which plays a model's clips: a looping base (Idle, Walk), one-shots on
-top (Attack, Hit, Die, Roar...), random fidgets while idle, short crossfades between clips, and moves across the
-board."""
-import copy
+its own nodes and clip clocks), Actor, which plays a model's clips: a looping base (Idle, Walk), one-shots on top
+(Attack, Hit, Die, Roar...), random fidgets while idle, short crossfades between clips, and moves across the board,
+and Static, a piece drawn as a baked mesh until it animates."""
 import math
 import os
 import random
@@ -10,10 +9,9 @@ import threading
 
 import numpy as np
 
-from unicode3d.animation import Animation, Clip
 from unicode3d.models import load_model
 from unicode3d.scene import Node
-from unicode3d.transforms import quat_axis_angle, quat_slerp
+from unicode3d.transforms import quat_axis_angle
 
 MODELS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "models")
 UP = np.array([0.0, 1.0, 0.0])
@@ -63,34 +61,8 @@ class Library:
                 self._load(f[:-4])
 
     def instance(self, name):
-        """A fresh copy of a model: new nodes and parts (sharing meshes), clips rebound to them."""
-        src = self._load(name)
-        mapping = {}
-
-        def clone(node):
-            if node is None:
-                return None
-            if node in mapping:
-                return mapping[node]
-            c = copy.copy(node)
-            mapping[node] = c
-            c.parent = clone(node.parent)
-            c.position = np.array(node.position, dtype=float)
-            c.rotation = np.array(node.rotation, dtype=float)
-            if isinstance(node.scale, np.ndarray):
-                c.scale = node.scale.copy()
-            return c
-
-        root = clone(src.root)
-        objects = [clone(o) for o in src.objects]
-        nodes = {k: clone(v) for k, v in src.nodes.items()}
-        clips = {}
-        for cname, clip in src.animations.items():
-            anims = [Animation(clone(a.target), speed=a.speed, **a.tracks) for a in clip.animations]
-            clips[cname] = Clip(anims, name=cname, loop=clip.loop, speed=clip.speed)
-        m = copy.copy(src)
-        m.root, m.objects, m.nodes, m.animations = root, objects, nodes, clips
-        return m
+        """A fresh copy of a model: its own nodes, parts and clip clocks, sharing meshes (Model.copy)."""
+        return self._load(name).copy()
 
 
 def _yaw_quat(yaw):
@@ -114,12 +86,6 @@ class Actor:
         self.base = "Idle" if "Idle" in self.clips else None
         self.current = None
         self.on_done = None
-        self._targets = []
-        for c in self.clips.values():
-            for a in c.animations:
-                if a.target not in self._targets:
-                    self._targets.append(a.target)
-        self._blend = None  # (snapshot, time left)
         self.fidget_in = self.rng.uniform(3, 9)
         self.motion = None  # (start, end, duration, t, arc height, then)
         self.turn_to = None
@@ -171,22 +137,15 @@ class Actor:
             if then:
                 then()
             return False
-        if blend and self.current:
-            self._blend = (self._snapshot(), self.BLEND)
         c = self.clips[clip]
-        c.time = 0.0
         c.speed = speed
         c.loop = "loop" if clip in ("Idle", "Walk", "Bubble") else "once"
         if c.loop == "loop" and clip != "Bubble":
             self.base = clip
+        c.start(fade=self.BLEND if blend and self.current else 0.0)
         self.current = clip
         self.on_done = then
-        c.apply(0.0)
         return True
-
-    def _snapshot(self):
-        return [(t, np.array(t.position, float), np.array(t.rotation, float),
-                 np.array(t.scale, float) if not np.isscalar(t.scale) else t.scale) for t in self._targets]
 
     def busy(self):
         return self.current is not None and self.current != self.base
@@ -207,17 +166,6 @@ class Actor:
                     self.current = None
                 if cb:
                     cb()
-        if self._blend:
-            snap, left = self._blend
-            left -= dt
-            k = max(0.0, left / self.BLEND)
-            k = k * k * (3 - 2 * k)
-            for t, p, r, s in snap:
-                t.position = p * k + np.asarray(t.position) * (1 - k)
-                t.rotation = quat_slerp(np.asarray(t.rotation), r, k)
-                if not np.isscalar(s):
-                    t.scale = s * k + np.asarray(t.scale, float) * (1 - k)
-            self._blend = (snap, left) if left > 0 else None
         # fidgets: now and then, while idling
         if not self.dead and self.current == "Idle" and not self.motion:
             self.fidget_in -= dt
@@ -274,87 +222,6 @@ class Actor:
         self.turn_to = yaw
 
 
-def bake(model):
-    """The model as it stands now, merged into as few Object3Ds as possible: one mesh holding every ordinary part
-    (vertices moved into the model root's space, part colours as face colours, textures kept), plus the parts
-    that glow or are see-through, kept apart. For static scenery: one object instead of dozens."""
-    from unicode3d.mesh import Mesh
-    from unicode3d.scene import Object3D
-    from unicode3d.transforms import world_matrix
-    saved = model.root.parent
-    model.root.parent = None
-    root_pos, root_rot, root_scale = model.root.position, model.root.rotation, model.root.scale
-    model.root.position, model.root.rotation, model.root.scale = np.zeros(3), np.array([1.0, 0, 0, 0]), 1.0
-    verts, faces, uvs, mats, fcols, textures, keep = [], [], [], [], [], [], []
-    base = 0
-    spec = []
-    for o in model.objects:
-        lin, pos, vis = world_matrix(o)
-        if not vis or o.mesh is None or not len(o.mesh.faces):
-            continue
-        if o.emissive > 0 or o.opacity < 1 or o.reflectivity > 0 or o.double_sided:
-            c = copy.copy(o)
-            c.parent = None
-            m = copy.copy(o.mesh)
-            m.vertices = np.asarray(o.mesh.vertices, float) @ lin.T + pos
-            m.normals = None
-            c.mesh, c.position, c.rotation, c.scale = m, np.zeros(3), np.array([1.0, 0, 0, 0]), 1.0
-            keep.append(c)
-            continue
-        m = o.mesh
-        v = np.asarray(m.vertices, float) @ lin.T + pos
-        f = np.asarray(m.faces, np.int64)
-        verts.append(v)
-        faces.append(f + base)
-        base += len(v)
-        n = len(f)
-        if m.uvs is not None and m.textures:
-            uvs.append(np.asarray(m.uvs, float))
-            mats.append(np.asarray(m.materials if m.materials is not None else np.zeros(n), np.int64) + len(textures))
-            textures.extend(m.textures)
-        else:
-            uvs.append(np.zeros((n, 3, 2)))
-            mats.append(np.full(n, -1, np.int64))
-        col = _srgb01(o.color)
-        if m.face_colors is not None:
-            fc = np.asarray(m.face_colors, float)[:, :3]
-            fc = fc / 255.0 if fc.max() > 1.0 else fc
-            fcols.append(fc * col)
-        elif m.vertex_colors is not None:
-            vc = np.asarray(m.vertex_colors, float)[:, :3]
-            vc = vc / 255.0 if vc.max() > 1.0 else vc
-            fcols.append(vc[f].mean(axis=1) * col)
-        else:
-            fcols.append(np.broadcast_to(col, (n, 3)))
-        spec.append((o.specular, o.shininess or 20.0, n))
-    model.root.position, model.root.rotation, model.root.scale = root_pos, root_rot, root_scale
-    model.root.parent = saved
-    out = []
-    if verts:
-        mesh = Mesh(np.concatenate(verts), np.concatenate(faces))
-        mesh.face_colors = np.concatenate(fcols)
-        if textures:
-            mat = np.concatenate(mats)
-            white = len(textures)
-            textures.append(np.ones((2, 2)))
-            mat[mat < 0] = white
-            mesh.uvs = np.concatenate(uvs)
-            mesh.materials = mat
-            mesh.textures = textures
-        total = sum(n for _, _, n in spec)
-        sp = sum(s * n for s, _, n in spec) / total
-        sh = sum(h * n for _, h, n in spec) / total
-        out.append(Object3D(mesh, color=(255, 255, 255), specular=sp, shininess=sh))
-    return out + keep
-
-
-def _srgb01(c):
-    c = np.asarray(c if not isinstance(c, int) else (200, 200, 200), float)
-    if c.shape != (3,):
-        c = np.asarray(getattr(c, "value", (200, 200, 200)), float)[:3]
-    return c / 255.0 if c.max() > 1.0 else c
-
-
 class Static:
     """A piece that stands still most of the time (a tower, a wall, a tree): drawn as a baked mesh shared by every
     copy, swapped for a live animated Actor only while it plays a clip."""
@@ -370,10 +237,10 @@ class Static:
             if clip and clip in m.animations:  # e.g. the collapsed pose: the end of Collapse
                 c = m.animations[clip]
                 c.apply(c.duration)
-            Static._baked[key] = bake(m)
-        self.parts = [copy.copy(o) for o in Static._baked[key]]
-        for p in self.parts:
-            p.parent = self.holder
+            Static._baked[key] = m.bake()
+        baked = Static._baked[key].copy()
+        baked.root.parent = self.holder
+        self.parts = baked.objects
         self.actor = None
         self.visible = True
 
