@@ -5,6 +5,12 @@ The cooperative tower-defence board game, played in a terminal and drawn in 3D b
 and a horde of goblins, orcs and trolls marching out of the forest, every piece an animated low-poly model.
 Linux and Windows (Windows Terminal recommended).
 
+![The main menu over the board: the castle in the middle, monsters in the rings, the forest around](Screenshots/Screenshot1.jpg)
+
+![The first turn of a solo game: the hand along the bottom, the log and the Order of play on the right](Screenshots/Screenshot2.jpg)
+
+![The camera zoomed in on a Knight standing on the castle wall](Screenshots/Screenshot3.jpg)
+
 ## Play
 
 **Windows**: download the zip from [Releases](https://github.com/arp-Trosh/castlepanic/releases), extract it and
