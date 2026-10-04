@@ -7,7 +7,7 @@ program to warn about. Renaming leaves the signature intact.
 python.exe runs a program named on its command line, but a double-clicked exe gets no arguments, so the game starts
 from here instead: CastlePanic._pth turns on the site module, site runs every .pth file in Lib/site-packages, and
 castlepanic.pth there says `import castlepanic_launch`. We then run the game and exit, before Python would reach its
-interactive prompt.
+interactive prompt. Started with arguments, it leaves Python alone (see the end).
 
 Set CASTLEPANIC_SELFTEST=1 to render the game off-screen and print a report instead (the release build runs this to
 check the package works).
@@ -140,4 +140,8 @@ def launch():
     os._exit(code)
 
 
-launch()
+# Only a bare start of the exe (a double-click) is the game. CastlePanic.exe started with arguments is Python doing
+# something else for it: unicode3d compiles its kernels on the first run in worker Pythons
+# (sys.executable -m unicode3d.precompile), and those must run as asked, not start another game.
+if len(getattr(sys, "orig_argv", sys.argv)) <= 1:
+    launch()

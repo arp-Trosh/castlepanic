@@ -63,3 +63,15 @@
   the view's camera drag. A `Drawer(Panel)` next to `DisplayControls` (`open`/`toggle()`, `draw(screen, bottom,
   left, width)`, `contains(x, y)`, a `badge`, content drawn through a callback with clipping) would cover it, and
   the same piece could serve help or log drawers.
+
+## Precompile workers vs. launchers that take over startup (2026-10-03, v0.11.0)
+
+`compile_kernels()` speeds up the first run with worker Pythons (`sys.executable -m unicode3d.precompile`). In a
+Windows release built like Zombie Dice's (the embeddable python.exe renamed CastlePanic.exe, the game started from a
+`.pth` file because a double-clicked exe gets no arguments), `sys.executable` is the game's exe, so each worker ran
+the `.pth` launcher and started the game (or its self-test, which started more workers) instead of compiling: the
+CI self-test hung for 15+ minutes, and a player's first start would have too. Fixed in the launcher (only a bare
+start, `len(sys.orig_argv) <= 1`, is the game). Zombie Dice's launcher has the same gap but pins v0.8.3, from
+before the workers: it needs the same guard when it upgrades. The engine could help either way: document it next
+to `compile_kernels`, or mark the workers (e.g. `UNICODE3D_PRECOMPILE_WORKER=1` in their environment) so a launcher
+can tell. With an empty cache the workers cut the first compile to 12.7 s here (12 threads).
