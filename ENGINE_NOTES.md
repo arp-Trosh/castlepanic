@@ -49,6 +49,13 @@
   box drawing in `Screen.picture()`. The built-in `fonts.PIXEL` isn't used (the banners keep their own styled
   fonts).
 
+## In 0.12.0 (2026-10-04)
+
+- Playing clips is no longer Python per track: a Clip samples all its tracks in one kernel (6-7 ms -> 0.5 ms a
+  frame here). Its tracks' keyframes are read once, so give an animation a new Track rather than editing one.
+- Shadows, panel text and the threading layer are faster too (see STATUS.md, Performance). On Linux, importing
+  unicode3d now prefers Numba's OpenMP layer with sleeping workers; the Windows release keeps its own (vcomp140).
+
 ## After 0.11.0 (2026-10-03)
 
 - **A one-frame flash from objects made mid-frame.** An Object3D is visible from construction at the origin, scale 1,
