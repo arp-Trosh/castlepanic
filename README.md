@@ -7,6 +7,12 @@ Linux and Windows (Windows Terminal recommended).
 
 ## Play
 
+**Windows**: download the zip from [Releases](https://github.com/arp-Trosh/castlepanic/releases), extract it and
+double-click `CastlePanic.exe`; nothing to install (see the README.txt inside). It is built and tested on Windows by
+`.github/workflows/windows-release.yml` whenever a `v*` tag is pushed (`packaging/windows/`).
+
+**From source** (Linux, macOS, Windows):
+
 ```sh
 python3 -m venv .venv && . .venv/bin/activate     # Windows: py -m venv .venv; .venv\Scripts\activate
 pip install -r requirements.txt
