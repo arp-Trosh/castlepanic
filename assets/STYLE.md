@@ -52,6 +52,7 @@ The board is 20 units across (castle ring radius 2.2). Models stand on Z=0 at th
 | bosses | their kind x 1.2 | |
 | healer | 0.85 | 0.5 |
 | humans (archer, swordsman, knight, hero, barbarian) | 0.90 | 0.5 |
+| knight_mounted (horse + rider; the game shows it at 1.1x, not 1.5x) | ~1.4 to the helm, withers 0.75 | 1.1 long; lance tip at Y -1.34, -1.60 at the Attack's full thrust (`LANCE_TIP` in scene.py) |
 | tower | 2.4 to the top of the crenellations (roof spire may go higher) | 1.1 across |
 | wall | 1.0 tall, 2.2 long along X, 0.35 thick | |
 | boulder | 1.0 across | |
@@ -93,7 +94,8 @@ crumbles first, ending as a low rubble pile) and stand intact with no clip playi
 ## Joint names
 
 Use `kit.humanoid()` for every biped (the game finds joints by these names): Root, Pelvis, Spine, Chest, Neck,
-Head, Jaw, ShoulderL/R, ElbowL/R, WristL/R, HipL/R, KneeL/R, AnkleL/R. Put weapons under a pivot named `Weapon`
+Head, Jaw, ShoulderL/R, ElbowL/R, WristL/R, HipL/R, KneeL/R, AnkleL/R. The horse (knight_mounted): HorseRoot,
+Body, HorseNeck, HorseHead, Tail, LegFL/FR/BL/BR, KneeFL.., FetFL.. (the rider's Root under Body); its Walk is a gallop. Put weapons under a pivot named `Weapon`
 parented to WristR (and `Shield`/`Offhand` to WristL). The archer's arrow is a pivot named `Arrow`.
 
 ## Checking your work

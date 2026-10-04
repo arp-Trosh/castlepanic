@@ -16,7 +16,7 @@ import numpy as np
 from numba import njit
 
 RATE = 22050
-VERSION = 6  # (bump when a sound changes: they are made once and cached)
+VERSION = 7  # (bump when a sound changes: they are made once and cached)
 
 
 def _t(dur):
@@ -168,6 +168,12 @@ def make_sounds():
     yell = _voice(pitch, "a", 0.45, 0.3, rng) * _env(len(t), 0.03, 0.15)
     S["charge"] = _norm(_mix((_bandpass(_noise(rng, 0.08), 3000, 2) * 0.5, 0), (yell, 0.04)), 0.75)
     S["drive_back"] = _norm(_mix((S["charge"], 0), (S["swing"], 0.2)), 0.75)
+    # joust: a war-cry over a galloping horse (four hoofbeats a stride: low thuds on turf, the stride 0.6 s)
+    n = int(0.09 * RATE)
+    thud = _lowpass(_noise(rng, 0.09), 350) * 2 + _sine(70, 0.09) * 0.8
+    hoofs = [(thud * _env(n, 0.002, 0.07) * rng.uniform(0.7, 1.0), k * 0.6 + b)
+             for k in range(3) for b in (0.0, 0.11, 0.24, 0.31)]
+    S["joust"] = _norm(_mix((yell, 0.05), *hoofs), 0.8)
 
     # monster voices by size: goblins shriek, orcs bark, trolls rumble
     def growl(base, vowel, dur, rasp, fall=0.3):

@@ -308,14 +308,20 @@ class Game:
         self.phase = "draw_up"
         self.events.append(Event("turn", seat=self.current, turn=self.turn))
         if not first:  # (the first player's hand was just dealt)
-            self._fill_hand(self.current)
+            drawn = self._fill_hand(self.current)
+            self.events.append(Event("draw_up", seat=self.current, cards=drawn))
         self.phase = "discard"  # nothing to decide in Draw Up: straight on to step 2
         self.events.append(Event("step", seat=self.current, step=self.phase))
 
     def _fill_hand(self, seat):
+        """Draw up to the hand size; returns the cards drawn."""
+        drawn = []
         while len(self.hands[seat]) < self.hand_size:
-            if not self._draw_card(seat):
+            cid = self._draw_card(seat)
+            if cid is None:  # (card 0 is a card too)
                 break
+            drawn.append(cid)
+        return drawn
 
     def _draw_card(self, seat, quiet=False):
         if not self.deck:

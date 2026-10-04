@@ -178,8 +178,9 @@ class Actor:
 
     # ------------------------------------------------------------------------------- moving
 
-    def move_to(self, target, duration=1.0, hop=0.0, walk=True, face=True, then=None):
-        """Slide to target over duration (walking in place if it has Walk), optionally in a hop of that height."""
+    def move_to(self, target, duration=1.0, hop=0.0, walk=True, face=True, then=None, ease=True):
+        """Slide to target over duration (walking in place if it has Walk), optionally in a hop of that height.
+        ease: start and stop gently (False: a constant speed, as a charge arrives)."""
         start = np.array(self.position, float)
         target = np.array(target, float)
         if face:
@@ -188,7 +189,7 @@ class Actor:
                 self.turn_to = math.atan2(d[0], d[2])
         if walk and "Walk" in self.clips and not self.dead:
             self.play("Walk")
-        self.motion = [start, target, max(duration, 1e-3), 0.0, hop, then]
+        self.motion = [start, target, max(duration, 1e-3), 0.0, hop, then, ease]
 
     def _update_motion(self, dt):
         if self.turn_to is not None:
@@ -201,11 +202,11 @@ class Actor:
                 self.set_yaw(self.yaw + math.copysign(step, diff))
         if not self.motion:
             return
-        start, end, dur, t, hop, then = self.motion
+        start, end, dur, t, hop, then, ease = self.motion
         t = min(dur, t + dt)
         self.motion[3] = t
         u = t / dur
-        e = u * u * (3 - 2 * u)
+        e = u * u * (3 - 2 * u) if ease else u
         p = start + (end - start) * e
         p[1] += hop * 4 * u * (1 - u)
         self.position = p

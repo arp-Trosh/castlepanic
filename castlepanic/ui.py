@@ -910,7 +910,9 @@ class App:
             return ("VICTORY! " if g.result == "won" else "DEFEAT. ") + (
                 "P play again, Q quit" if s.is_host else "Q quit")
         if g.pending.get(me) == "discard1":
-            return "All players discard 1 card: press its number"
+            if mode == "forced_discard":
+                return f"Discard {card_title(g.cards[ui['card']])}? Click it again (or press its number)"
+            return "All players discard 1 card: click it twice, or press its number"
         if g.trade_offer and g.trade_offer["to"] == me:
             o = g.trade_offer
             return (f"{s.names[o['from']]} offers {card_title(g.cards[o['give']])} for your "
@@ -1083,6 +1085,7 @@ class App:
             i = int(ch) - 1
             if 0 <= i < len(hand):
                 self._send({"a": "forced_discard", "card": hand[i]})
+                self._reset_ui()
             return
         if mode == "target" and ch and ch in LETTERS:
             for mid, letter in ui["letters"].items():
@@ -1169,6 +1172,13 @@ class App:
             return
         cid = hand[i]
         mode = ui.get("mode")
+        if g.pending.get(me) == "discard1":  # (a Monster token's "All Players Discard 1 Card": click twice)
+            if mode == "forced_discard" and ui["card"] == cid:
+                self._send({"a": "forced_discard", "card": cid})
+                self._reset_ui()
+            else:
+                self.ui = {"mode": "forced_discard", "card": cid, "chosen": [cid]}
+            return
         if mode == "discard" and ui["card"] == cid:
             self._send({"a": "discard", "card": cid})
             self._reset_ui()

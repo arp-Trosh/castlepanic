@@ -13,7 +13,7 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   3p 31%, 4p 42%, 5p 45%, 6p 18%), up from ~16% before the trade rework. Room to improve: planning across the team.
 - **3D** (`scene.py`, `actors.py`, `fx.py`, `board.py`): painted mat + table, 36 forest props, 6 towers / walls /
   palisades, sentries fidgeting on the walls, every rules event animated (spawns walk in, defenders loose arrows or
-  charge out, Hit/Die clips with blood, walls/towers collapse with dust and debris, the boulder rolls through and
+  charge out, Hit/Die clips with blood, the Knight jousts (gallops out on a barded destrier and drives a chrome lance home as it comes into range, then wheels back; the foot knight still stands sentry on the walls), walls/towers collapse with dust and debris, the boulder rolls through and
   crushes, tar, drive back, build, heal sparkles, victory/defeat). Camera eases to the action; arrows/+/-/R steer.
   Static pieces are baked into a few meshes each (unicode3d's `Model.bake`) for speed; every piece is a
   `Model.copy()` of a model loaded once, and clips crossfade with `Clip.start(fade)`.
@@ -36,17 +36,17 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   sound ("phew" + a suspended-to-major horn chord). Monsters sharing a space shrink (85% for two, 70% for three or
   more); in a Castle space whose Tower has fallen they stand on the rubble. The Fortify palisade's stake tips stand
   just above the battlements (1.12-1.24 tall against the wall's 1.0), on thicker stakes, 1.25x the wall's length.
-  Trading by mouse: click your card and one of theirs (or their name) in the Defenders list, either way round.
+  "All Players Discard 1 Card" by mouse: click a card twice (or press its number). Trading by mouse: click your card and one of theirs (or their name) in the Defenders list, either way round.
   Multiplayer chat docks in the bottom bar (a Chat tab with an unread count; click or Tab slides it up over the
   view, Esc/Tab/click docks it) and chimes softly (`chat` in sound.py) for other players' messages.
 - **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections on the menu's Settings
   screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
   shows only the frame rate (achieved/target, clickable).
 - **unicode3d v0.11.0** (camera parents, `DisplayControls(show=...)`, block lettering), pinned in requirements.txt.
-- **Sound** (`sound.py`): 35 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
+- **Sound** (`sound.py`): 36 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all. A Plague! that takes cards
-  plays a sad trombone ("wah wah wahhh", `plague`) with its first discard.
-- **Assets**: 21 models by Blender scripts in `assets/src/` (kit + STYLE.md), exported to `castlepanic/data/models/`.
+  plays a sad trombone ("wah wah wahhh", `plague`) with its first discard; the Knight's charge, a war-cry over hoofbeats (`joust`).
+- **Assets**: 22 models by Blender scripts in `assets/src/` (kit + STYLE.md), exported to `castlepanic/data/models/`.
   Tools: `tools/preview.py` (terminal-accurate contact sheets), `tools/scene_game.py` (bot game through the scene,
   off-screen), `tools/ui_test.py` (scripted UI run with screenshots).
 

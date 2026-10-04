@@ -24,8 +24,13 @@ from .rules import ARCS, CASTLE, FOREST, SWORDSMAN, KNIGHT, ARCHER, arc_color
 SCALE = {"goblin": 1.7, "orc": 1.55, "troll": 1.4, "goblin_king": 1.6, "orc_warlord": 1.35, "troll_mage": 1.3,
          "healer": 1.5}
 DEFENDER_SCALE = 1.5
-DEFENDER_FOR = {"archer": "archer", "knight": "knight", "swordsman": "swordsman", "hero": "hero",
+DEFENDER_FOR = {"archer": "archer", "knight": "knight_mounted", "swordsman": "swordsman", "hero": "hero",
                 "barbarian": "barbarian"}
+MOUNTED_SCALE = 1.1  # the mounted Knight (a horse at DEFENDER_SCALE would fill the Knight ring)
+STRIKE = 0.9  # how far from its Monster a defender on foot stands to strike
+WALL_TOP = 1.0  # where a defender stands on the battlements (as the sentries do)
+LANCE_TIP = (0.0, 1.6)  # the lance tip at the Attack's full thrust, model units: (to the rider's left, ahead)
+LANCE_HIT = 0.45  # seconds into Attack when the thrust is fully home
 BANNER_RGB = {"red": (170, 30, 24), "green": (40, 120, 40), "blue": (40, 70, 170)}
 TAR = blob_mesh((0.5, 0.06, 0.5))
 SPAWN_AFTER = 0.5  # seconds after "tHe mOnsTeRs aRe CoMing!" that they appear
@@ -459,6 +464,9 @@ class BoardScene:
             self.on_sound("hit")
             self.wait = 0.4
             return
+        if name == "knight_mounted":
+            self._joust(start, target)
+            return
         d = Actor(self.lib, name, start, 0.0, scale=DEFENDER_SCALE, rng=self.rng)
         d.set_yaw(math.atan2(target[0] - start[0], target[2] - start[2]))
         self.defenders.append(d)
@@ -473,7 +481,15 @@ class BoardScene:
                 self._after(1.6, lambda: setattr(d, "visible", False))
             self._wait_for(loose)
         else:
-            near = target + (start - target) / max(np.linalg.norm(start - target), 1e-6) * 0.9
+            run = target - start
+            run[1] = 0.0
+            u = run / max(float(np.linalg.norm(run)), 1e-6)
+            if np.linalg.norm(run) < STRIKE + 0.4:  # a Monster close in: start further back (on the battlements,
+                start = target - u * (STRIKE + 0.4)   # if that is inside the wall line) so as to charge AT it
+                start[1] = WALL_TOP if np.hypot(start[0], start[2]) < np.hypot(wp[0], wp[2]) + 0.1 else 0.0
+                d.position = start
+            d.set_yaw(math.atan2(u[0], u[2]))
+            near = target - u * STRIKE
             def charge(done):
                 self.on_sound("charge")
                 hop = 0.9 if name == "barbarian" else 0.25
@@ -483,6 +499,33 @@ class BoardScene:
                     self._after(0.45, done)
                 d.move_to(near, 0.55, hop=hop, then=strike)
             self._wait_for(charge)
+
+    def _joust(self, start, target):
+        """The Knight gallops out at the Monster, lance couched, and drives it home as the tip comes into range;
+        then wheels about and rides back to the wall."""
+        side, ahead = LANCE_TIP[0] * MOUNTED_SCALE, LANCE_TIP[1] * MOUNTED_SCALE
+        run = target - start
+        run[1] = 0.0
+        dist = max(float(np.linalg.norm(run)), 1e-6)
+        u = run / dist
+        left = np.array([u[2], 0.0, -u[0]])  # the rider's left, facing u
+        start = start - left * side  # one line from the wall that brings the lance tip, not the horse, to it
+        strike = target - u * ahead - left * side
+        if np.dot(strike - start, u) < 0.6:  # a Monster close in: back off far enough to charge
+            start = strike - u * 0.6
+        d = Actor(self.lib, "knight_mounted", start, math.atan2(u[0], u[2]), scale=MOUNTED_SCALE, rng=self.rng)
+        self.defenders.append(d)
+        gallop = max(0.55, float(np.linalg.norm(strike - start)) / 2.6)
+
+        def charge(done):
+            self.on_sound("joust")
+            d.move_to(strike, gallop, ease=False, then=lambda: d.play("Attack", then=ride_back))
+            self._after(gallop + LANCE_HIT * 0.6, lambda: self.on_sound("swing"))
+
+            def ride_back():
+                d.move_to(start, 0.9, then=lambda: setattr(d, "visible", False))
+            self._after(gallop + LANCE_HIT, done)
+        self._wait_for(charge)
 
     def _after(self, t, fn):
         self._timers = getattr(self, "_timers", [])

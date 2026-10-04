@@ -35,6 +35,11 @@ def describe(e, game, names):
             return None
         why = {"discard": "discards", "plague": "loses to the Plague", "discard1": "discards"}.get(e.get("why"), "discards")
         return f"{who} {why} {card(e['card'])}"
+    if k == "draw_up":
+        cards = e.get("cards") or []
+        if not cards:
+            return f"{who}'s hand is full: no cards to draw"
+        return f"{who} draws up {len(cards)} card{'s' if len(cards) > 1 else ''}: " + ", ".join(card(c) for c in cards)
     if k == "draw2":
         return f"{who} draws 2 cards"
     if k == "offer":

@@ -176,6 +176,15 @@ class Rules(unittest.TestCase):
             self.assertEqual((g.current, g.phase), (1, "discard"))
             self.assertEqual(len(g.hands[1]), g.hand_size)
 
+    def test_draw_up_past_card_zero(self):
+        g = Game(["solo"], seed=11)
+        g.discard_pile.extend(g.hands[0])
+        g.hands[0] = []
+        g.deck.remove(0) if 0 in g.deck else g.discard_pile.remove(0)
+        g.deck.append(0)  # card 0 comes off the top first
+        g._fill_hand(0)
+        self.assertEqual(len(g.hands[0]), g.hand_size)
+
     def test_solo_two_discards_no_trade(self):
         g = Game(["solo"], seed=11)
         apply(g, 0, {"a": "discard", "card": g.hands[0][0]})
