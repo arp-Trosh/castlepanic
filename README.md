@@ -19,7 +19,7 @@ pip install -r requirements.txt
 python3 -m castlepanic [--name NAME] [--no-sound]
 ```
 
-The first start compiles the renderer (10-20 s). A big terminal with a small font looks best; 100x30 is the
+The first start compiles the renderer (up to a minute). A big terminal with a small font looks best; 100x30 is the
 minimum that's comfortable.
 
 - **Single Player**: 1 player is the solo game (hand of 6, discard up to 2); 2-6 fills the other seats with bots.

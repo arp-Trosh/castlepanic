@@ -9,7 +9,7 @@ STARTING
   1. Extract the whole zip first (right-click > Extract All). Don't run it from inside the zip.
   2. Open the CastlePanic folder and double-click CastlePanic.exe.
 
-  The first start takes 10-20 seconds ("First run compile, please wait..."): the 3D graphics
+  The first start takes up to a minute ("First run compile, please wait..."): the 3D graphics
   are compiled for your PC once and kept in the folder, so later starts are quick.
 
   It needs Windows 10 or 11. Windows Terminal (the default on Windows 11, and free in the

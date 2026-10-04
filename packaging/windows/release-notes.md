@@ -12,7 +12,7 @@ This is a playtest release: please report anything odd, with what you were doing
 3. Open the `CastlePanic` folder and double-click **CastlePanic.exe**.
 
 Needs Windows 10 or 11; nothing to install. Windows Terminal (the default on Windows 11) looks best; maximize the
-window. The first start takes 10-20 seconds while the 3D graphics are compiled for your PC; later starts are quick.
+window. The first start takes up to a minute while the 3D graphics are compiled for your PC; later starts are quick.
 
 `CastlePanic.exe` is the official `python.exe` from python.org's embeddable package, renamed and still signed by the
 Python Software Foundation. The release contains no unsigned or packed executable, so Windows has nothing to warn you
