@@ -4,3 +4,5 @@ __pycache__/
 assets/build/
 assets/previews/
 *.egg-info/
+FirstPromptResult.txt
+castlePanicInitialPrompt.txt
