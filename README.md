@@ -1,8 +1,6 @@
 # Castle Panic (terminal 3D)
 
-The cooperative tower-defence board game, played in a terminal and drawn in 3D by
-[unicode3d](https://github.com/arp-Trosh/unicode3d): the board on a tabletop, a castle of six towers and walls,
-and a horde of goblins, orcs and trolls marching out of the forest, every piece an animated low-poly model.
+The boardgame Castle Panic, adapted as a Terminal game in 3d.
 Linux and Windows (Windows Terminal recommended).
 
 ![The main menu over the board: the castle in the middle, monsters in the rings, the forest around](Screenshots/Screenshot1.jpg)
@@ -14,8 +12,7 @@ Linux and Windows (Windows Terminal recommended).
 ## Play
 
 **Windows**: download the zip from [Releases](https://github.com/arp-Trosh/castlepanic/releases), extract it and
-double-click `CastlePanic.exe`; nothing to install (see the README.txt inside). It is built and tested on Windows by
-`.github/workflows/windows-release.yml` whenever a `v*` tag is pushed (`packaging/windows/`).
+double-click `CastlePanic.exe`; nothing to install (see the README.txt inside).
 
 **From source** (Linux, macOS, Windows):
 
@@ -25,8 +22,7 @@ pip install -r requirements.txt
 python3 -m castlepanic [--name NAME] [--no-sound]
 ```
 
-The first start compiles the renderer (up to a minute). A big terminal with a small font looks best; 100x30 is the
-minimum that's comfortable.
+The first start compiles the renderer (up to a minute). A big terminal with a small font looks best.
 
 - **Single Player**: 1 player is the solo game (hand of 6, discard up to 2); 2-6 fills the other seats with bots.
 - **Host Game**: choose seats (2-6), bots on/off (B) and the port (default 5555). The lobby waits for players;
@@ -48,7 +44,6 @@ minimum that's comfortable.
 | Q (twice) | leave the game |
 | F2-F6 | glyphs, colours, frame rate, shadows, reflections |
 
-Everything the 3D shows is also in the log on the right (what was played, what moved, what fell).
 
 ## Rules
 
@@ -57,13 +52,4 @@ A turn goes in six steps: 1 draw up, 2 discard and draw 1 (solo: 2), 3 trade 1 c
 passed. It's co-operative: every hand is open to all, so trade for what the team needs.
 
 Standard Castle Panic: hit Monsters with cards matching their ring and colour, rebuild Walls with Brick + Mortar,
-survive all 49 Monster tokens. Most points of slain Monsters is the Master Slayer. The Monster pile's effect tokens
-are a best reconstruction of the published mix (see `castlepanic/rules.py`, `TOKENS`).
-
-## Making the art
-
-Every model is a Blender Python script in `assets/src/` (see `assets/STYLE.md` and `assets/src/kit.py`), built with
-`blender -b --python assets/src/<name>.py`, and checked with `tools/preview.py`, which renders contact sheets as the
-terminal shows them. Sounds are synthesized in `castlepanic/sound.py`. Everything is original.
-
-`ENGINE_NOTES.md` collects what building this game taught about unicode3d.
+survive all 49 Monster tokens. Most points of slain Monsters is the Master Slayer. 
