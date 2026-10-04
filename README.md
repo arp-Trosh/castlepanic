@@ -30,6 +30,8 @@ minimum that's comfortable.
 | X | in the Discard step, discard the chosen card and draw (or click it again) |
 | T | in the Trade step: your card (or click it), the player, their card (they accept with Y or decline with N) |
 | arrows / WASD, +/-, wheel | turn, tilt and zoom the camera; R resets it |
+| Esc | cancel a choice; while your trade offer waits for an answer, take it back |
+| H or F1 | how to play (F1 while picking by letter, where H is a letter) |
 | M | sound on/off |
 | Q (twice) | leave the game |
 | F2-F6 | glyphs, colours, frame rate, shadows, reflections |
@@ -39,7 +41,7 @@ Everything the 3D shows is also in the log on the right (what was played, what m
 ## Rules
 
 A turn goes in six steps: 1 draw up, 2 discard and draw 1 (solo: 2), 3 trade 1 card with another player (6 players:
-2, with two different players), 4 play cards, 5 the Monsters move, 6 draw 2 new Monsters. Steps 2 and 3 can be
+2, with one player or two), 4 play cards, 5 the Monsters move, 6 draw 2 new Monsters. Steps 2 and 3 can be
 passed. It's co-operative: every hand is open to all, so trade for what the team needs.
 
 Standard Castle Panic: hit Monsters with cards matching their ring and colour, rebuild Walls with Brick + Mortar,

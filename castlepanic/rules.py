@@ -5,7 +5,7 @@ KNIGHT, ARCHER and FOREST (4, where Monsters arrive). Arcs 0-1 are red, 2-3 gree
 line between each arc's Swordsman ring and its Castle space.
 
 A turn goes through six steps (`STEPS`, `game.phase`): draw up (done for the player, straight on to step 2),
-discard and draw 1 (two in solo), trade 1 card (in a 6-player game 2, with two different players), play cards, the
+discard and draw 1 (two in solo), trade 1 card (in a 6-player game 2, with one player or two), play cards, the
 Monsters move, 2 new Monsters are drawn; the player moves on from each with `next_step`; then the next player
 draws up. All hands are open: this is a
 co-operative game.
@@ -160,7 +160,6 @@ class Game:
         self.phase = "draw_up"
         self.discards_used = 0
         self.trades_used = 0
-        self.traded_with = []  # seats traded with this turn (a 6-player game's two trades are with two players)
         self.no_monsters = False  # Missing played this turn
         self.to_draw = 0  # monster tokens still to draw this turn
         self.pending = {}  # seat -> what that player must decide before play goes on ("discard1")
@@ -185,7 +184,7 @@ class Game:
 
     FIELDS = ("names", "hand_size", "max_discards", "max_trades", "cards", "deck", "discard_pile", "monsters",
               "next_mid", "walls", "fortified", "towers", "hands", "trophies", "monster_discard", "turn", "current",
-              "phase", "discards_used", "trades_used", "traded_with", "no_monsters", "to_draw", "pending", "trade_offer", "result",
+              "phase", "discards_used", "trades_used", "no_monsters", "to_draw", "pending", "trade_offer", "result",
               "pile")
 
     def to_dict(self, hide_pile=True):
@@ -299,7 +298,6 @@ class Game:
     def _begin_turn(self, first=False):
         self.turn += 1
         self.discards_used = self.trades_used = 0
-        self.traded_with = []
         self.no_monsters = False
         for m in self.monsters.values():  # Tar wears off at the start of the next player's turn
             if m["tar"]:
@@ -374,8 +372,6 @@ class Game:
             raise IllegalMove("no more trades this turn")
         if to == seat or not 0 <= to < self.players:
             raise IllegalMove("trade with someone else")
-        if to in self.traded_with:
-            raise IllegalMove(f"you've traded with {self.names[to]} already: the second trade is with someone else")
         if give not in self.hands[seat] or take not in self.hands[to]:
             raise IllegalMove("those cards aren't there")
         self.trade_offer = {"from": seat, "to": to, "give": give, "take": take}
@@ -393,7 +389,6 @@ class Game:
             self.hands[a].append(offer["take"])
             self.hands[b].append(offer["give"])
             self.trades_used += 1
-            self.traded_with.append(b)
             self.events.append(Event("trade", **offer))
         else:
             self.events.append(Event("declined", **offer))

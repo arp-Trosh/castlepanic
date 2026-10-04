@@ -83,6 +83,27 @@ class Net(unittest.TestCase):
         self.assertEqual(host.seats[1]["kind"], "bot")
         host.close()
 
+    def test_bad_messages_dont_crash_the_host(self):
+        import json
+        import socket
+        host = HostSession("H", max_players=3, bots_on=True, port=0, seed=2)
+        client = ClientSession("G", "127.0.0.1", host.port)
+        raw = socket.create_connection(("127.0.0.1", host.port))
+        try:
+            raw.sendall(b'{"t": "hello", "name": "Raw"}\n')
+            pump(host, client, 2, until=lambda: len(host.seats) == 3)
+            host.start()
+            pump(host, client, 1, until=lambda: client.game is not None)
+            for msg in ({"t": "act", "action": [1]}, {"t": "act", "action": "next"}, {"t": "act", "action": None},
+                        {"t": "act", "action": {"a": "play", "card": [1]}}, {"t": "hello", "name": "again"}):
+                raw.sendall(json.dumps(msg).encode() + b"\n")
+                pump(host, client, 0.2)
+            self.assertEqual(host.seats[2]["kind"], "remote")  # (a second hello doesn't cost a seated player their seat)
+        finally:
+            raw.close()
+            client.close()
+            host.close()
+
 
 if __name__ == "__main__":
     unittest.main()

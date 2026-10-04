@@ -176,7 +176,7 @@ def trade_wish(game, seat):
     # rough first pass: cards worth taking (useful to me now) and giving (little use to me, more to them)
     rough = []
     for other in range(game.players):
-        if other == seat or other in game.traded_with:
+        if other == seat:
             continue
         for take in game.hand(other):
             gain_now = card_value(game, take, seat) - card_value(game, take, other)

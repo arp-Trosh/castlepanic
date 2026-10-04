@@ -46,6 +46,7 @@ CHAT_H = 8  # the game screen's chat panel, docked in the bottom bar until wante
 CHAT_SLIDE = 0.3  # seconds it takes to slide up out of the bar, or back down into it
 CHAT_BG = (14, 14, 20)
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
+LETTER_MODES = ("target", "scavenge", "trade_take")  # choosing by letter
 HP_PIP = "●"
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
 RING_LABELS_FAR = 26.0  # camera distance beyond which only one line of ring names shows
@@ -72,7 +73,7 @@ HELP = [
     "",
     "Your turn, a step at a time (N, Enter or NEXT STEP moves on):",
     "  1 draw up (by itself)  2 discard & draw 1 (click a card twice; solo: 2)  3 trade 1 card",
-    "  (6 players: 2, with two players)  4 play cards  5 the Monsters move  6 draw 2 Monsters",
+    "  (6 players: 2, with one player or two)  4 play cards  5 the Monsters move  6 draw 2 Monsters",
     "All hands are open: it's a co-operative game, so trade for what you need (click your card,",
     "  then a player's card in Defenders, either way round).",
     "",
@@ -90,6 +91,18 @@ HELP = [
     "",
     "Press H or Esc to close.",
 ]
+
+
+def _port(text):
+    """The port typed (blank: the default); ValueError unless it is one."""
+    port = int(text.strip() or DEFAULT_PORT)
+    if not 1 <= port <= 65535:
+        raise ValueError(f"port {port} is out of range (1-65535)")
+    return port
+
+
+def _printable_non_digit(k):
+    return isinstance(k, int) and 32 <= k < 127 and not chr(k).isdigit()
 
 
 def card_color(c):
@@ -145,6 +158,7 @@ class App:
         self.hand_boxes = []  # (x0, y0, x1, y1, card id)
         self.next_box = (-1, -1, -1, -1)  # the Next Step button: x0, y0, x1, y1
         self.side_boxes = []  # (x0, y0, x1, y1, seat, card id or None for the name) in the Defenders list
+        self.pile_boxes = []  # (x0, y0, x1, y1, card id) in the Scavenge popup
         self.click_zones = []  # (x0, y0, x1, y1, callback)
         self._demo()
         self.last_sync = 0.0
@@ -307,8 +321,8 @@ class App:
                 return self._menu_select()
             elif k == Key.ESC:
                 return False
-            elif editing is not None and editing.handle(k):
-                pass
+            elif editing is not None and (editing is not f["port"] or not _printable_non_digit(k)) and editing.handle(k):
+                pass  # (a port takes digits only: B and P still work while typing one)
             elif self.menu_index == 1 and k in (ord("b"), ord("B")):
                 f["bots"] = not f["bots"]
             elif self.menu_index == 1 and k in (ord("p"), ord("P")):
@@ -327,14 +341,14 @@ class App:
                 self.session = single_player(self.name, f["players"], seed=self.seed)
                 self._begin_game(self.session.start())
             elif i == 1:
-                port = int(f["port"].value or DEFAULT_PORT)
+                port = _port(f["port"].value)
                 self.session = HostSession(self.name, max_players=f["host_players"], bots_on=f["bots"], port=port,
                                            seed=self.seed)
                 self.mode = "lobby"
             elif i == 2:
                 addr = f["address"].value.strip()
                 host, _, port = addr.partition(":")
-                self.session = ClientSession(self.name, host or "127.0.0.1", int(port or DEFAULT_PORT))
+                self.session = ClientSession(self.name, host or "127.0.0.1", _port(port))
                 self.mode = "lobby"
             elif i == 4:
                 self.mode = "settings"
@@ -510,9 +524,14 @@ class App:
                 put(y, left, " " * width, Color.WHITE)
         put(top, left, "─" * width, Color.WHITE, dim=True)
         put(top, left + 2, " Chat ", Color.CYAN)
-        lines = [t for t, kind in self.session.log if kind in ("chat", "system")][-(height - 2):]
-        for i, t in enumerate(lines):
-            put(top + 1 + i, left + 1, t[:width - 2], Color.WHITE if ":" in t else Color.CYAN)
+        room, lines = height - 2, []
+        for t, kind in self.session.log[-room * 4:]:
+            if kind in ("chat", "system"):
+                color, w = Color.WHITE if ":" in t else Color.CYAN, max(8, width - 2)
+                lines += [(t[k:k + w] if k == 0 else "  " + t[k:k + w - 2], color)
+                          for k in [0] + list(range(w, len(t), w - 2))]  # (a long message wraps)
+        for i, (t, color) in enumerate(lines[-room:]):
+            put(top + 1 + i, left + 1, t, color)
         y = top + height - 1
         if self.chat_input is not None:
             put(y, left + 1, ("> " + self.chat_input.value + "_")[-(width - 2):], Color.YELLOW)
@@ -571,6 +590,7 @@ class App:
         rest = [e for e in events if e.get("e") != "spawn"]
         if not any(e.get("e") == "turn" for e in rest):  # (a client is sent the state, not the opening events)
             rest.append({"e": "turn", "seat": g.current, "turn": g.turn})
+            self._narrate(rest[-1:])
         self.scene.play(INTRO + [{"e": "wave", "spawns": wave}] + rest)
 
     def _narrate(self, events):
@@ -581,9 +601,8 @@ class App:
                 s.say(text, "game")
 
     def _feed(self, events):
-        if any(e.get("e") == "_sync" for e in events):
-            self._new_scene()
-            self.scene.sync(self.session.game)
+        if any(e.get("e") == "_sync" for e in events):  # (a client sent a new game: the host played again)
+            return self._begin_game(events)
         self._narrate(events)
         self.scene.play([e for e in events if e.get("e") != "_sync"])
 
@@ -628,7 +647,8 @@ class App:
         for k in keys:
             if self._chat_key(k):
                 continue
-            if k in (ord("h"), ord("H"), Key.F1) or (self.ui.get("help") and k == Key.ESC):
+            picking = self.ui.get("mode") in LETTER_MODES  # (then H is a choice's letter; F1 still helps)
+            if k == Key.F1 or (k in (ord("h"), ord("H")) and not picking) or (self.ui.get("help") and k == Key.ESC):
                 self.ui["help"] = not self.ui.get("help")
                 continue
             if self.scene.banners and k in SKIP_KEYS:
@@ -663,6 +683,10 @@ class App:
         towers = "".join("♖" if t else "." for t in g.towers) if screen.unicode else \
             "".join("T" if t else "." for t in g.towers)
         right = f"Towers {towers}  Walls {sum(g.walls)}/6  Monsters left {len(g.pile)}  Deck {len(g.deck)} "
+        if len(txt) + len(right) >= cols:  # (narrow: shorter, so whose turn it is still shows)
+            right = f"{towers} Walls {sum(g.walls)} Left {len(g.pile)} Deck {len(g.deck)} "
+            txt = txt[:max(0, cols - len(right) - 1)]
+            screen.text(0, 0, txt, Color.YELLOW if mine else Color.WHITE, reverse=True, bold=mine)
         screen.text(0, cols - len(right), right, Color.WHITE, reverse=True)
 
     def _spot(self, point, text, owner=None, hide=True):
@@ -756,24 +780,34 @@ class App:
         screen.text(y, x, "Defenders", Color.CYAN, bold=True)
         y += 1
         self.side_boxes = []
+        compact = 1 + 2 * len(s.names) > height  # (a short terminal: each player's cards on their name's line)
         for i, name in enumerate(s.names):
+            if y >= top + height - (0 if compact else 1):
+                break
             cur = i == g.current
             mark = "▶" if cur and screen.unicode else (">" if cur else " ")
             you = "*" if i == s.my_seat else ""
-            line = f"{mark}{i + 1} {name[:12]}{you}"
+            line = f"{mark}{i + 1} {name[:6 if compact else 12]}{you}"
             partner = self.ui.get("partner") == i
             screen.text(y, x, line, Color.YELLOW if cur else Color.WHITE, bold=cur or partner, reverse=partner)
-            sc = f"{g.score(i)}pt"
-            screen.text(y, x + width - len(sc), sc, Color.WHITE)
-            self.side_boxes.append((x, y, x + width - 1, y, i, None))
-            y += 1
-            xx = x + 2
+            if compact:
+                self.side_boxes.append((x, y, x + len(line) - 1, y, i, None))
+                xx = x + len(line) + 1
+            else:
+                sc = f"{g.score(i)}pt"
+                screen.text(y, x + width - len(sc), sc, Color.WHITE)
+                self.side_boxes.append((x, y, x + width - 1, y, i, None))
+                y += 1
+                xx = x + 2
             for k, c in enumerate(g.hand(i)):
                 cid = g.hands[i][k]
                 lab = SHORT[c["kind"]]
                 if self.ui.get("mode") == "trade_take" and partner:
                     lab = f"{LETTERS[k]}{lab}"
-                if xx + len(lab) >= x + width:
+                if xx + len(lab) > x + width:  # (a long hand wraps: every card shows, to see and to click)
+                    y += 1
+                    xx = x + 2
+                if y >= top + height:
                     break
                 screen.text(y, xx, lab, card_color(c), reverse=self.ui.get("take") == cid)
                 self.side_boxes.append((xx, y, xx + len(lab) - 1, y, i, cid))
@@ -915,8 +949,8 @@ class App:
             return "All players discard 1 card: click it twice, or press its number"
         if g.trade_offer and g.trade_offer["to"] == me:
             o = g.trade_offer
-            return (f"{s.names[o['from']]} offers {card_title(g.cards[o['give']])} for your "
-                    f"{card_title(g.cards[o['take']])}: Y accept, N decline")
+            return (f"Y accept, N decline: {s.names[o['from']]} offers {card_title(g.cards[o['give']])} for your "
+                    f"{card_title(g.cards[o['take']])}")
         if mode == "target":
             return "Choose a Monster: its letter or click it (Esc cancels)"
         if mode == "wall":
@@ -924,22 +958,23 @@ class App:
         if mode == "nice":
             return "Nice Shot: now choose the hit card to play it with (Esc cancels)"
         if mode == "scavenge":
-            return "Scavenge: choose a card from the discard pile (letter, Esc cancels)"
+            return "Scavenge: choose a card from the discard pile (its letter or click it, Esc cancels)"
         if mode == "discard":
             return f"Discard {card_title(g.cards[ui['card']])} and draw a new card? Click it again or X (Esc cancels)"
         if mode == "pair":
             return f"{card_title(g.cards[ui['card']])}: now choose a {ui['need'].capitalize()} to go with it (Esc cancels)"
         if mode == "trade_give":
             if ui.get("take") is not None:
-                return (f"Trade for {s.names[ui['partner']]}'s {card_title(g.cards[ui['take']])}: which of your cards "
-                        "do you give? (click or number, Esc cancels)")
+                return (f"For {s.names[ui['partner']]}'s {card_title(g.cards[ui['take']])}, give which card? "
+                        "(click or number, Esc cancels)")
             return "Trade: which of your cards do you give? (click or number, Esc cancels)"
         if mode == "trade_partner":
-            return "Trade with whom? Click their name or the card you want in Defenders, or their number (Esc cancels)"
+            return "Trade with whom? Click a card or name in Defenders, or a number (Esc cancels)"
         if mode == "trade_take":
             return f"Which of {s.names[ui['partner']]}'s cards do you want? (click or letter, Esc cancels)"
         if g.trade_offer:
-            return f"Waiting for {s.names[g.trade_offer['to']]} to answer the trade..."
+            mine = " (Esc takes it back)" if g.trade_offer["from"] == me else ""
+            return f"Waiting for {s.names[g.trade_offer['to']]} to answer the trade...{mine}"
         if g.pending:
             return "Waiting for players to discard..."
         if self.scene.busy() and g.current != me:
@@ -951,11 +986,11 @@ class App:
         if g.phase == "discard":
             if g.discards_used >= g.max_discards:
                 return "Discarded. Next Step to " + ("trade" if g.max_trades else "play cards")
-            return "Discard a card and draw a new one: click it (optional), or Next Step to pass"
+            return "Discard & draw a new card: click one (optional), or Next Step to pass"
         if g.phase == "trade":
             if g.trades_used >= g.max_trades:
                 return "Traded. Next Step to play cards"
-            return "Trade: click a card of yours to give, or one of theirs in Defenders (optional), or Next Step to pass"
+            return "Trade (optional): click your card and one in Defenders, or Next Step"
         if g.phase == "play":
             return "Play cards (click or number), then Next Step: the Monsters move"
         if g.phase == "move":
@@ -971,15 +1006,29 @@ class App:
 
     def _popups(self, screen, rows, cols):
         g = self.session.game
+        self.pile_boxes = []
         if self.ui.get("mode") == "scavenge":
-            pile = g.discard_pile[-26:]
-            w, h = 36, min(len(pile), 20) + 2
-            x, y = (cols - w) // 2, max(2, (rows - h) // 2)
-            screen.text(y, x, " Discard pile ".center(w, "="), Color.YELLOW, reverse=True)
-            self.ui["pile"] = list(reversed(pile))[:20]
-            for i, cid in enumerate(self.ui["pile"]):
+            # one of each card in the whole pile, newest first (two of the same card are the same choice): at most
+            # 25 kinds, so they all have letters; in columns if the terminal is short
+            seen = {}
+            for cid in reversed(g.discard_pile):
                 c = g.cards[cid]
-                screen.text(y + 1 + i, x, f" {LETTERS[i]}  {card_title(c)}".ljust(w), card_color(c), reverse=True)
+                seen.setdefault((c["kind"], c["color"]), cid)
+            pile = self.ui["pile"] = list(seen.values())[:len(LETTERS)]
+            per_col = max(1, min(len(pile), rows - 6))
+            ncol = -(-len(pile) // per_col)
+            cw = 28
+            w = max(36, cw * ncol)
+            x, y = max(0, (cols - w) // 2), max(1, (rows - per_col - 1) // 2)
+            screen.text(y, x, " Discard pile: take one ".center(w, "="), Color.YELLOW, reverse=True)
+            for i in range(ncol * per_col):
+                cx, cy = x + (i // per_col) * (w // ncol), y + 1 + i % per_col
+                if i >= len(pile):
+                    screen.text(cy, cx, " " * (w // ncol), Color.WHITE, reverse=True)
+                    continue
+                c = g.cards[pile[i]]
+                screen.text(cy, cx, f" {LETTERS[i]}  {card_title(c)}".ljust(w // ncol), card_color(c), reverse=True)
+                self.pile_boxes.append((cx, cy, cx + w // ncol - 1, cy, pile[i]))
         if g.phase == "over":
             w = 44
             x, y = (cols - w) // 2, 4
@@ -1006,6 +1055,11 @@ class App:
             return
         if not (ev.pressed and ev.button == MouseEvent.LEFT) or ev.moved:
             return
+        for x0, y0, x1, y1, cid in self.pile_boxes:  # (the Scavenge popup)
+            if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
+                self._send({"a": "play", "card": self.ui["card"], "target": cid})
+                self._reset_ui()
+                return
         x0, y0, x1, y1 = self.next_box
         if x0 <= ev.x <= x1 and y0 <= ev.y <= y1:
             if self.session.game.current == self.session.my_seat:
@@ -1039,9 +1093,6 @@ class App:
             if g.current == me and g.phase in ("discard", "trade") and not g.trade_offer:
                 self.flash("No more trades this turn" if g.phase == "trade" else "Trading is step 3, after discarding")
             return
-        if seat in g.traded_with:
-            self.flash(f"You've traded with {s.names[seat]} already: the second trade is with someone else")
-            return
         if not g.hands[seat]:
             self.flash(f"{s.names[seat]} has no cards")
             return
@@ -1074,6 +1125,8 @@ class App:
         if k == Key.ESC:
             if ui.get("mode"):
                 self._reset_ui()
+            elif g.trade_offer and g.trade_offer["from"] == me:  # no answer coming: take the offer back
+                self._send({"a": "cancel"})
             return
         mode = ui.get("mode")
         # answers others are waiting on
@@ -1119,7 +1172,7 @@ class App:
                 self._reset_ui()
             return
         if ch == "q":
-            if self.quit_armed > 0 or g.phase == "over":
+            if self.quit_armed > 0 or g.phase == "over" or s.error:  # (over, or the host has gone: nothing to lose)
                 self._leave()
             else:
                 self.quit_armed = 2.0

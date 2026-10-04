@@ -95,6 +95,8 @@ class HostSession(SessionBase):
         if self.bots_on:
             self.fill_bots()
         self.game = Game(self.names, seed=self.seed if self.seed is not None else self.rng.randrange(1 << 30))
+        self._offered = {}  # (trades the bots have tried, by turn: a new game starts again at turn 1)
+        self._bot_wait = 0.0
         self.phase = "game"
         self.say(f"The siege begins! {len(self.seats)} defender{'s' if len(self.seats) > 1 else ''}.")
         events = self.game.take_events()
@@ -193,7 +195,7 @@ class HostSession(SessionBase):
 
     def _handle(self, cid, msg):
         t = msg.get("t")
-        if t == "hello":
+        if t == "hello" and self._seat_of(cid) is None:
             if self.phase != "lobby":
                 return self._refuse(cid, "The game has already begun.")
             if len(self.seats) >= self.max_players:
@@ -221,8 +223,12 @@ class HostSession(SessionBase):
                 self.server.broadcast({"t": "chat", "name": name, "text": text})
             return []
         if t == "act" and self.phase == "game":
+            action = msg.get("action")
+            if not isinstance(action, dict):
+                self.server.send(cid, {"t": "error", "msg": "bad action"})
+                return []
             try:
-                return self.act(msg.get("action") or {}, seat)
+                return self.act(action, seat)
             except (IllegalMove, KeyError, TypeError, ValueError) as e:
                 self.server.send(cid, {"t": "error", "msg": str(e)})
         return []
@@ -310,8 +316,9 @@ class ClientSession(SessionBase):
             elif t == "events":
                 old = self.game
                 self.game = Game.from_dict(msg["state"])
-                if old is not None and hasattr(old, "_kinds"):
-                    self.game._kinds = old._kinds
+                if old is not None:  # (what each Monster was, for the log to name those slain since)
+                    self.game._kinds = {**getattr(old, "_kinds", {}),
+                                        **{mid: m["kind"] for mid, m in old.monsters.items()}}
                 events += msg["events"]
             elif t == "chat":
                 self.say(f"{msg['name']}: {msg['text']}" if msg.get("name") else msg["text"],

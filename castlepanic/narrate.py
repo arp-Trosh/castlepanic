@@ -46,6 +46,8 @@ def describe(e, game, names):
         return f"{names[e['from']]} offers {card(e['give'])} to {names[e['to']]} for {card(e['take'])}"
     if k == "trade":
         return f"{names[e['from']]} and {names[e['to']]} trade"
+    if k == "cancelled":
+        return f"{who} takes back the trade offer"
     if k == "declined":
         return f"{names[e['to']]} declines the trade"
     if k == "attack":

@@ -5,7 +5,7 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
 ## Done
 - **Rules** (`rules.py`): the full standard game + solo variant; JSON state for the network. A turn is six steps
   (`STEPS`), each moved on from with the `next` action (Draw Up moves on to Discard by itself): draw up, discard 1 (solo 2), trade 1 (6 players: 2, with
-  two different players), play, Monsters move, draw 2 Monsters. Tests: `tests/test_rules.py`
+  one player or two), play, Monsters move, draw 2 Monsters. Tests: `tests/test_rules.py`
   (incl. 300 all-bot games checking cards/tokens are conserved), `tests/test_net.py` (lobby, start, chat, remote
   turns, out-of-turn errors, disconnect -> bot).
 - **Bots** (`bots.py`): one-move lookahead for hits/slays, rules of thumb for the rest; trades read the open hands
@@ -56,6 +56,11 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   is drawing and 6-7 ms playing clips (Python, ~0.6 ms per animated model; in ENGINE_NOTES.md).
 - Visual polish: monsters read dark at whole-board zoom; mat terrain could use scattered rocks/grass props; the
   orc warlord and barbarian previews show the agents' known issues (hands off hafts, murky colours).
-- Windows packaging (zombieDice's PyInstaller workflow) and a real-terminal playtest on Windows Terminal.
+- Windows packaging (zombieDice's embeddable-Python build + GitHub workflow) and a real-terminal playtest on Windows
+  Terminal. Before any fresh install works: unicode3d's v0.10.0/v0.11.0 tags exist only locally (GitHub has up to
+  v0.9.0), and this repo has no GitHub remote yet.
+- Bug hunt (2026-10-03): rules fuzz (random legal/illegal moves, garbage values: conservation, JSON round trip),
+  32 whole games through the UI with random keys/clicks at 70x20-120x34 (no crash, scene matches state), a
+  host+client game over localhost, malformed network messages, a pty run of `python -m castlepanic`.
 - Assumptions to confirm: the monster effect-token mix (move_<colour> x2 each, draw3 x1, draw4 x1) and boss HP
   (King 2, Warlord 3, Mage 3, Healer 2).

@@ -194,15 +194,14 @@ class Rules(unittest.TestCase):
         apply(g, 0, {"a": "next"})
         self.assertEqual(g.phase, "play")
 
-    def test_six_players_trade_with_two(self):
+    def test_six_players_trade_twice(self):
         g = Game(list("abcdef"), seed=12)
         apply(g, 0, {"a": "next"})
         apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
         apply(g, 1, {"a": "answer", "accept": True})
-        with self.assertRaises(IllegalMove):  # the second trade is with someone else
-            apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
-        apply(g, 0, {"a": "offer", "to": 2, "give": g.hands[0][0], "take": g.hands[2][0]})
-        apply(g, 2, {"a": "answer", "accept": True})
+        # the second trade may be with the same player (2 cards with one player, or 1 each with two)
+        apply(g, 0, {"a": "offer", "to": 1, "give": g.hands[0][0], "take": g.hands[1][0]})
+        apply(g, 1, {"a": "answer", "accept": True})
         with self.assertRaises(IllegalMove):  # and that's all
             apply(g, 0, {"a": "offer", "to": 3, "give": g.hands[0][0], "take": g.hands[3][0]})
 
