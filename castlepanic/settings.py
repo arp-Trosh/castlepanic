@@ -1,9 +1,9 @@
-"""The display settings (glyphs, colours, frame rate, shadows, reflections), kept between runs in a small JSON file:
-~/.config/castlepanic/settings.json (on Windows, %APPDATA%\\castlepanic\\settings.json)."""
+"""The display settings (glyphs, colours, frame rate, shadows, reflections, detail), kept between runs in a small JSON
+file: ~/.config/castlepanic/settings.json (on Windows, %APPDATA%\\castlepanic\\settings.json)."""
 import json
 import os
 
-KEYS = ("glyphs", "color", "fps", "shadows", "reflections")
+KEYS = ("glyphs", "color", "fps", "shadows", "reflections", "detail")
 
 
 def _path():

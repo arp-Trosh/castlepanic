@@ -14,8 +14,8 @@ Everything works by keyboard and most things by mouse too. The game screen:
     | (multiplayer) chat                                          |
     | keys help                                         frame rate |
 
-The display settings (glyphs, colours, frame rate, shadows, reflections) are on the menu's Settings screen, kept
-between runs (settings.py); F2-F6 still switch them anywhere.
+The display settings (glyphs, colours, frame rate, shadows, reflections, detail) are on the menu's Settings screen,
+kept between runs (settings.py); F2-F6 still switch the first five anywhere.
 """
 import math
 import time
@@ -25,7 +25,7 @@ import numpy as np
 from unicode3d.keys import Key, MouseEvent
 from unicode3d.scene import Renderer
 from unicode3d.terminal import Color
-from unicode3d.ui import DisplayControls
+from unicode3d.ui import Choice, DisplayControls
 
 from . import board, settings
 from .narrate import describe
@@ -48,7 +48,9 @@ CHAT_BG = (14, 14, 20)
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 LETTER_MODES = ("target", "scavenge", "trade_take")  # choosing by letter
 HP_PIP = "●"
-SIMPLIFY = 1.0  # Renderer.simplify: how many pixels a simpler copy of a model may differ by where it is drawn instead
+# The Detail setting: Renderer.simplify, how many pixels a simpler copy of a model may differ by where it is drawn
+# instead (standard), or every model as it is (high).
+DETAIL = {"standard": 1.0, "high": 0.0}
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
 RING_LABELS_FAR = 26.0  # camera distance beyond which only one line of ring names shows
 # a short tag over each Monster, so it's known at a glance (set SHOW_TAGS False to drop them)
@@ -137,13 +139,16 @@ class App:
         self.session = None
         self.scene = BoardScene(seed=seed or 1, on_sound=self.sound.play)
         self.renderer = Renderer(1, 1)
-        # Models far finer than the board view shows (a goblin ~10 pixels tall, 1,680 triangles): simpler copies of
-        # them where they differ by under a pixel (about 12% faster mid-game).
-        self.renderer.simplify = SIMPLIFY
+        # Models far finer than the board view shows (a goblin ~10 pixels tall, 1,680 triangles): at standard detail,
+        # simpler copies of them where they differ by under a pixel (about 15% faster mid-game).
+        self.detail = Choice("", tuple(DETAIL), get=self._get_detail, set=self._set_detail)
+        self.renderer.simplify = DETAIL["standard"]
         # Drawn: the frame rate only; the rest are on the Settings screen (and F2-F6).
         self.controls = DisplayControls(renderer=self.renderer, show=("fps",))
         self.saved = settings.load()
         self.controls.apply({k: v for k, v in self.saved.items() if k not in fixed})  # (they wait for the screen)
+        if self.saved.get("detail") in DETAIL:
+            self.detail.value = self.saved["detail"]
         self.settings_index = 0
         self.form = {"players": 1, "host_players": 4, "port": TextInput(str(DEFAULT_PORT), 5),
                      "address": TextInput("127.0.0.1", 60), "name": TextInput(self.name, MAX_NAME), "bots": True,
@@ -196,9 +201,9 @@ class App:
         first = self.controls.screen is None
         keys = self.controls.handle(keys, screen)
         if first:  # what the saved settings and the command line came to on this terminal
-            self.saved = self.controls.settings()
-        elif self.controls.settings() != self.saved:
-            self.saved = self.controls.settings()
+            self.saved = self._settings()
+        elif self._settings() != self.saved:
+            self.saved = self._settings()
             settings.save(self.saved)
         rows, cols = screen.size()
         screen.erase()
@@ -256,7 +261,18 @@ class App:
         return [("glyphs", "Characters", c.glyphs, str), ("color", "Colours", c.color, str),
                 ("fps", "Frame rate", c.fps, lambda v: f"{v} fps"),
                 ("shadows", "Shadows", c.shadows, lambda v: "on" if v else "off"),
-                ("reflections", "Reflections", c.reflections, lambda v: "on" if v else "off")]
+                ("reflections", "Reflections", c.reflections, lambda v: "on" if v else "off"),
+                ("detail", "Detail", self.detail, str)]
+
+    def _settings(self):
+        """Every display setting, as settings.py keeps them."""
+        return {**self.controls.settings(), "detail": self.detail.value}
+
+    def _get_detail(self):
+        return "high" if self.renderer.simplify == DETAIL["high"] else "standard"
+
+    def _set_detail(self, value):
+        self.renderer.simplify = DETAIL[value]
 
     # ---------------------------------------------------------------------------------------------- menu
 

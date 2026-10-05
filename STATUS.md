@@ -39,8 +39,10 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   "All Players Discard 1 Card" by mouse: click a card twice (or press its number). Trading by mouse: click your card and one of theirs (or their name) in the Defenders list, either way round.
   Multiplayer chat docks in the bottom bar (a Chat tab with an unread count; click or Tab slides it up over the
   view, Esc/Tab/click docks it) and chimes softly (`chat` in sound.py) for other players' messages.
-- **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections on the menu's Settings
-  screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work. The bottom bar
+- **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections and detail on the menu's
+  Settings screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work for the
+  first five. Detail: standard draws small models from simpler copies within a pixel (unicode3d levels of detail,
+  `Renderer.simplify` 1; needs unicode3d after 0.12.0 to make a difference), high draws every model in full. The bottom bar
   shows only the frame rate (achieved/target, clickable).
 - **unicode3d v0.12.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0 faster on slow
   machines), pinned in requirements.txt.
