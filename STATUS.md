@@ -40,12 +40,12 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   Multiplayer chat docks in the bottom bar (a Chat tab with an unread count; click or Tab slides it up over the
   view, Esc/Tab/click docks it) and chimes softly (`chat` in sound.py) for other players' messages.
 - **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections and detail on the menu's
-  Settings screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F6 still work for the
-  first five. Detail: standard draws small models from simpler copies within a pixel (unicode3d levels of detail,
-  `Renderer.simplify` 1; needs unicode3d after 0.12.0 to make a difference), high draws every model in full. The bottom bar
+  Settings screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F7 still work. Detail:
+  standard (the default) draws small models from simpler copies within a pixel (unicode3d 0.13.0's levels of detail,
+  `Renderer.simplify` 1), high draws every model in full. The bottom bar
   shows only the frame rate (achieved/target, clickable).
-- **unicode3d v0.12.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0 faster on slow
-  machines), pinned in requirements.txt.
+- **unicode3d v0.13.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0 and 0.13.0
+  faster on slow machines, 0.13.0 levels of detail), pinned in requirements.txt.
 - **Sound** (`sound.py`): 36 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all. A Plague! that takes cards
   plays a sad trombone ("wah wah wahhh", `plague`) with its first discard; the Knight's charge, a war-cry over hoofbeats (`joust`).
@@ -60,7 +60,9 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   unicode3d v0.12.0 (2026-10-04), from profiling the game on an older 4-core laptop where it ran at 8-9 fps: a bot
   game at 206x49 on 4 cores / 8 threads, mid-game, 36.6 -> 24.7 ms a frame (workers sleeping between kernels, clips
   in a kernel, settled shadow casters kept, faster panel text); the laptop estimated at ~12.6 fps, to be measured.
-  The work and what is next: ~/Documents/Claude/unicode3dperformance.md.
+  unicode3d v0.13.0 (2026-10-05): levels of detail at 1 pixel (half the triangles drawn) and less Python per
+  object, 24.5 -> 19.5 ms a frame the same way; the laptop, with turbo on, measured 16 fps on 0.12.0 and estimated
+  at ~20 on 0.13.0, to be measured. The work and what is next: ~/Documents/Claude/unicode3dperformance.md.
 - Visual polish: monsters read dark at whole-board zoom; mat terrain could use scattered rocks/grass props; the
   orc warlord and barbarian previews show the agents' known issues (hands off hafts, murky colours).
 - Windows release (2026-10-03): `packaging/windows/` (embeddable Python as CastlePanic.exe, self-test, ConPTY smoke

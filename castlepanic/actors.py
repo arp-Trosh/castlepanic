@@ -9,11 +9,8 @@ import threading
 
 import numpy as np
 
+from unicode3d.detail import detail_levels
 from unicode3d.models import load_model
-try:
-    from unicode3d.detail import detail_levels
-except ImportError:  # (unicode3d before levels of detail)
-    detail_levels = None
 from unicode3d.scene import Node
 from unicode3d.transforms import quat_axis_angle
 
@@ -54,8 +51,7 @@ class Library:
                     if o.mesh is not None:  # when it is first drawn)
                         for m in range(len(o.mesh.textures)):
                             o.mesh.mipmaps(m)
-                        if detail_levels is not None:
-                            detail_levels(o.mesh)
+                        detail_levels(o.mesh)
                 self.models[name] = model
             return self.models[name]
 

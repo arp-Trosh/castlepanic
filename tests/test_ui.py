@@ -24,11 +24,11 @@ class Settings(unittest.TestCase):
             screen = Screen(None, size=(30, 100))
             app = App("Test", sound=False, seed=1)
             app.frame(screen, 1 / 30, [])
-            self.assertEqual((app.detail.value, app.renderer.simplify), ("standard", 1.0))
+            self.assertEqual((app.controls.detail.value, app.renderer.simplify), ("standard", 1.0))
             app.mode, app.settings_index = "settings", 0
             app.frame(screen, 1 / 30, [Key.DOWN] * 5 + [Key.RIGHT])  # (Detail is the sixth line)
             app.frame(screen, 1 / 30, [])
-            self.assertEqual((app.detail.value, app.renderer.simplify), ("high", 0.0))
+            self.assertEqual((app.controls.detail.value, app.renderer.simplify), ("high", 0.0))
             with open(os.path.join(config, "castlepanic", "settings.json")) as f:
                 self.assertEqual(json.load(f)["detail"], "high")
             again = App("Test", sound=False, seed=1)

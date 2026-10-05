@@ -49,6 +49,13 @@
   box drawing in `Screen.picture()`. The built-in `fonts.PIXEL` isn't used (the banners keep their own styled
   fonts).
 
+## In 0.13.0 (2026-10-05)
+
+- Levels of detail: the game sets `Renderer.simplify` to 1 (standard detail): monsters ~10 pixels tall are drawn
+  from simpler copies of their meshes, half the triangles mid-game. The library makes each model's levels while
+  preloading it (`detail.detail_levels`). Detail is a DisplayControls setting (F7), on the Settings screen too.
+- Less Python per object each frame, and spawning an arrow or dust adds to the mesh pack instead of rebuilding it.
+
 ## In 0.12.0 (2026-10-04)
 
 - Playing clips is no longer Python per track: a Clip samples all its tracks in one kernel (6-7 ms -> 0.5 ms a
