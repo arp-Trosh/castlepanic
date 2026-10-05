@@ -10,6 +10,10 @@ import threading
 import numpy as np
 
 from unicode3d.models import load_model
+try:
+    from unicode3d.detail import detail_levels
+except ImportError:  # (unicode3d before levels of detail)
+    detail_levels = None
 from unicode3d.scene import Node
 from unicode3d.transforms import quat_axis_angle
 
@@ -46,10 +50,12 @@ class Library:
         with lock:
             if name not in self.models:
                 model = load_model(os.path.join(self.folder, name + ".glb"))
-                for o in model.objects:  # (a texture's mipmaps, built now rather than when it is first drawn)
-                    if o.mesh is not None:
+                for o in model.objects:  # (a texture's mipmaps and the levels of detail, made now rather than
+                    if o.mesh is not None:  # when it is first drawn)
                         for m in range(len(o.mesh.textures)):
                             o.mesh.mipmaps(m)
+                        if detail_levels is not None:
+                            detail_levels(o.mesh)
                 self.models[name] = model
             return self.models[name]
 

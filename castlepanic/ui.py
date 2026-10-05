@@ -48,6 +48,7 @@ CHAT_BG = (14, 14, 20)
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 LETTER_MODES = ("target", "scavenge", "trade_take")  # choosing by letter
 HP_PIP = "●"
+SIMPLIFY = 1.0  # Renderer.simplify: how many pixels a simpler copy of a model may differ by where it is drawn instead
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
 RING_LABELS_FAR = 26.0  # camera distance beyond which only one line of ring names shows
 # a short tag over each Monster, so it's known at a glance (set SHOW_TAGS False to drop them)
@@ -136,6 +137,9 @@ class App:
         self.session = None
         self.scene = BoardScene(seed=seed or 1, on_sound=self.sound.play)
         self.renderer = Renderer(1, 1)
+        # Models far finer than the board view shows (a goblin ~10 pixels tall, 1,680 triangles): simpler copies of
+        # them where they differ by under a pixel (about 12% faster mid-game).
+        self.renderer.simplify = SIMPLIFY
         # Drawn: the frame rate only; the rest are on the Settings screen (and F2-F6).
         self.controls = DisplayControls(renderer=self.renderer, show=("fps",))
         self.saved = settings.load()
