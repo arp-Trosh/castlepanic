@@ -47,6 +47,10 @@ class Library:
         with lock:
             if name not in self.models:
                 model = load_model(os.path.join(self.folder, name + ".glb"))
+                for part, parts in model.names.items():  # (a shield's blue face is a thin plate on its back: a level
+                    if part.startswith("Shield"):        # of detail could sink it behind, flickering as you zoom)
+                        for o in parts:
+                            o.simplify = False
                 for o in model.objects:  # (a texture's mipmaps and the levels of detail, made now rather than
                     if o.mesh is not None:  # when it is first drawn)
                         for m in range(len(o.mesh.textures)):
