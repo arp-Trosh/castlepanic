@@ -49,6 +49,16 @@
   box drawing in `Screen.picture()`. The built-in `fonts.PIXEL` isn't used (the banners keep their own styled
   fonts).
 
+## In 0.15.0 (2026-10-05)
+
+- `Object3D(simplify=False)` keeps a part out of levels of detail. Banner letters use it (quality fast's 2 px
+  levels made them illegible), and so do the parts in `actors.EXACT` and every part named Shield...: thin plates
+  laid on other parts, which a level made for that part alone sinks behind them, flickering with zoom (the
+  knight's shield face; brows, belts, rags, greaves, the tower's stones). `Model.bake` keeps the flag.
+- Auto quality steps down only while frames run under 20 fps (`AutoQuality.min_fps`): the game feels good at 30
+  and plays well at 20.
+- Shadow maps' bookkeeping a little cheaper.
+
 ## In 0.14.0 (2026-10-05)
 
 - Automatic quality: the game starts DisplayControls with `quality="auto"`; Quality is on the Settings screen

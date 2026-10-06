@@ -46,8 +46,9 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   picture down while frames can't keep up with the frame rate (edge smoothing, detail, then sharpness; never
   shadows) and back up when they can; high keeps it as set; fast holds the lowest step. The bottom bar
   shows only the frame rate (achieved/target, clickable).
-- **unicode3d v0.14.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0-0.14.0
-  faster on slow machines, 0.13.0 levels of detail, 0.14.0 automatic quality), pinned in requirements.txt.
+- **unicode3d v0.15.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0-0.14.0
+  faster on slow machines, 0.13.0 levels of detail, 0.14.0 automatic quality, 0.15.0 `Object3D.simplify` and
+  auto quality only below 20 fps), pinned in requirements.txt.
 - **Sound** (`sound.py`): 36 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all. A Plague! that takes cards
   plays a sad trombone ("wah wah wahhh", `plague`) with its first discard; the Knight's charge, a war-cry over hoofbeats (`joust`).
@@ -66,7 +67,9 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   object, 24.5 -> 19.5 ms a frame the same way; the laptop, with turbo on, measured 16 fps on 0.12.0 and estimated
   at ~20 on 0.13.0, measured 21 fps mid-game (48 ms). unicode3d v0.14.0 (2026-10-05): faster rasterizing and
   shading (about -3 ms on the laptop, estimated) and automatic quality (on by default here): edge smoothing off
-  and 70% of the pixels measured 46 -> 34 ms on the laptop (30 fps median); to be measured in real play. The work
+  and 70% of the pixels measured 46 -> 34 ms on the laptop (30 fps median); to be measured in real play.
+  unicode3d v0.15.0 (2026-10-05): auto steps down only below 20 fps (it stepped down within a minute at ~24);
+  the 54 thin parts kept from levels of detail (below) cost about +3% (+0.6 ms here). The work
   and what is next: ~/Documents/Claude/unicode3dperformance.md.
 - Visual polish: monsters read dark at whole-board zoom; mat terrain could use scattered rocks/grass props; the
   orc warlord and barbarian previews show the agents' known issues (hands off hafts, murky colours).
