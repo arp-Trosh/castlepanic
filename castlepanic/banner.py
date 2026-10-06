@@ -79,6 +79,15 @@ def letter_mesh(style, ch, first=False):
     return _meshes[key]
 
 
+def prepare():
+    """Make every letter's mesh now (the preload thread calls this), so that the first banner of a run doesn't pause
+    the game while its letters are made (~1.4 ms each: ~26 ms for the first)."""
+    for style, p in STYLE.items():
+        for ch in p["font"]:
+            for first in (False, True):
+                letter_mesh(style, ch, first)
+
+
 def _ease_out_back(t, s=1.6):
     t -= 1
     return 1 + t * t * ((s + 1) * t + s)

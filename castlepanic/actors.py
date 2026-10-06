@@ -14,6 +14,8 @@ from unicode3d.models import load_model
 from unicode3d.scene import Node
 from unicode3d.transforms import quat_axis_angle
 
+from . import banner, board
+
 MODELS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "models")
 UP = np.array([0.0, 1.0, 0.0])
 # Parts drawn without levels of detail (Object3D.simplify=False): thin plates laid on other parts, which a level of
@@ -90,7 +92,10 @@ class Library:
 
     def preload(self):
         """Load every model in the folder, so that a monster's first appearance doesn't pause the game while its
-        model loads (50-150 ms each, about a second for all)."""
+        model loads (50-150 ms each, about a second for all). First the board's mipmaps and levels of detail and the
+        banners' letters, which the first frames need (made while the kernels load, before the menu's first frame)."""
+        board.prepare()
+        banner.prepare()
         for f in sorted(os.listdir(self.folder)):
             if f.endswith(".glb"):
                 self._load(f[:-4])

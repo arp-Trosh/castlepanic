@@ -6,9 +6,11 @@ up-left, as on the real board.
 """
 import math
 import os
+import threading
 
 import numpy as np
 
+from unicode3d.detail import detail_levels
 from unicode3d.mesh import Mesh
 from unicode3d.scene import Object3D
 
@@ -259,10 +261,33 @@ def quad_mesh(half_x, half_z, y, texture, tiles=1.0):
     return m
 
 
+_meshes = []  # the mat's and the table's meshes, made once a run (see _board_meshes)
+_meshes_lock = threading.Lock()
+
+
+def _board_meshes():
+    """The mat's and the table's meshes, made the first time and shared by every board after: the renderer keeps a
+    texture's mipmaps and a mesh's levels of detail by the arrays themselves, so a board built afresh each game
+    (cached_texture loads a new array every call) made them again in its first frame (~80 ms)."""
+    with _meshes_lock:
+        if not _meshes:
+            _meshes.extend([disc_mesh(BOARD, texture=cached_texture("mat", paint_mat)),
+                            quad_mesh(40, 40, -0.06, cached_texture("table", paint_table), tiles=6.0)])
+        return list(_meshes)
+
+
+def prepare():
+    """Make the board's mipmaps and levels of detail now (the preload thread calls this first, while the kernels
+    load), rather than in the first frame that draws it."""
+    for mesh in _board_meshes():
+        for m in range(len(mesh.textures)):
+            mesh.mipmaps(m)
+        detail_levels(mesh)
+
+
 def build():
-    """The mat and the table: a list of Object3Ds."""
-    mat = Object3D(disc_mesh(BOARD, texture=cached_texture("mat", paint_mat)), color=(255, 255, 255),
-                   specular=0.15, shininess=8)
-    table = Object3D(quad_mesh(40, 40, -0.06, cached_texture("table", paint_table), tiles=6.0), color=(255, 255, 255),
-                     specular=0.3, shininess=20)
+    """The mat and the table: a list of Object3Ds (their meshes shared by every board: see _board_meshes)."""
+    mat_mesh, table_mesh = _board_meshes()
+    mat = Object3D(mat_mesh, color=(255, 255, 255), specular=0.15, shininess=8)
+    table = Object3D(table_mesh, color=(255, 255, 255), specular=0.3, shininess=20)
     return [mat, table]
