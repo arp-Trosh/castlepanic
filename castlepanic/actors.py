@@ -16,6 +16,37 @@ from unicode3d.transforms import quat_axis_angle
 
 MODELS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "models")
 UP = np.array([0.0, 1.0, 0.0])
+# Parts drawn without levels of detail (Object3D.simplify=False): thin plates laid on other parts, which a level of
+# detail made on its own sinks behind them (most lost over half their pixels at standard detail), so they flicker
+# as zoom changes the level. By model; each part by a name of its own, or the two names it alone has both of. Every
+# part named Shield... too (the shields' blue faces). Costs about 1-2% of a mid-game frame (measured 2026-10-05).
+EXACT = {
+    "archer": ["Belt", "HoodBrow", "Stave0"],
+    "barbarian": ["FootL", "BootCuffL", "BootCuffR", "Loin4", "Loin5", "Brow", "HairA0m", "HairA1m", "HairA2m"],
+    "goblin": ["Belt", "FootL", "FootR", "Brow"],
+    "goblin_king": ["Belt", "FootL", "FootR", "Brow"],
+    "healer": ["Belt", "Rag0", "Rag1", "Rag2", "Rag4", "Rag5", "Rag7"],
+    "hero": ["GreaveL", "GreaveR", "JawPart"],
+    "knight": ["GreaveL", "GreaveR", "Belt"],
+    "knight_mounted": [("BodyMesh", "Gold"), ("Gold", "LanceButt"), ("Leather", "SpineMesh")],
+    "orc": ["RagTail", "BracerL"],
+    "orc_warlord": ["RagTail", "Crossbar"],
+    "swordsman": ["Belt"],
+    "tower": ["SlitB", "ChunkStone0", "ChunkStone1", "ChunkStone2", "ChunkStone3", "ChunkStone4", "ChunkStone5",
+              "ChunkStone6", "Course", "Slit4", "Eave"],
+    "troll_mage": ["JawPart", "Staff"],
+}
+
+
+def _exact_parts(name, model):
+    """The parts of model `name` to draw without levels of detail (see EXACT)."""
+    for part, parts in model.names.items():
+        if part.startswith("Shield"):
+            yield from parts
+    for entry in EXACT.get(name, ()):
+        names = (entry,) if isinstance(entry, str) else entry
+        held = [{id(o): o for o in model.names.get(n, ())} for n in names]
+        yield from (o for i, o in held[0].items() if all(i in h for h in held[1:]))
 
 
 class Library:
@@ -47,10 +78,8 @@ class Library:
         with lock:
             if name not in self.models:
                 model = load_model(os.path.join(self.folder, name + ".glb"))
-                for part, parts in model.names.items():  # (a shield's blue face is a thin plate on its back: a level
-                    if part.startswith("Shield"):        # of detail could sink it behind, flickering as you zoom)
-                        for o in parts:
-                            o.simplify = False
+                for o in _exact_parts(name, model):
+                    o.simplify = False
                 for o in model.objects:  # (a texture's mipmaps and the levels of detail, made now rather than
                     if o.mesh is not None:  # when it is first drawn)
                         for m in range(len(o.mesh.textures)):
