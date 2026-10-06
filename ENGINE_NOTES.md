@@ -49,6 +49,13 @@
   box drawing in `Screen.picture()`. The built-in `fonts.PIXEL` isn't used (the banners keep their own styled
   fonts).
 
+## In 0.16.0 (2026-10-06)
+
+- Nothing to change in the game. Shading a little cheaper (the shadow filter reads 3 x 3 texels at the default
+  softness, not 4 x 4: shadow edges slightly crisper), and the renderer's per-object bookkeeping cheaper (levels
+  of detail picked in kernels, colours reused as dust and arrows come and go): about 0.6 ms a game frame here,
+  ~1.5 ms on the laptop (estimate).
+
 ## In 0.15.0 (2026-10-05)
 
 - `Object3D(simplify=False)` keeps a part out of levels of detail. Banner letters use it (quality fast's 2 px
