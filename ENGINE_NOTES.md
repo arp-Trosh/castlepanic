@@ -49,6 +49,14 @@
   box drawing in `Screen.picture()`. The built-in `fonts.PIXEL` isn't used (the banners keep their own styled
   fonts).
 
+## In 0.14.0 (2026-10-05)
+
+- Automatic quality: the game starts DisplayControls with `quality="auto"`; Quality is on the Settings screen
+  (auto / high / fast) and F8, saved with the rest. Frames are timed by `run()` (`screen.frame_time`), so
+  benchmarks that call `App.frame` directly (cpbench) never step down.
+- The Settings screen puts its lines one apart instead of two where the terminal is short (20 rows).
+- Faster rasterizing and shading; glass resting on a surface no longer flickers.
+
 ## In 0.13.0 (2026-10-05)
 
 - Levels of detail: the game sets `Renderer.simplify` to 1 (standard detail): monsters ~10 pixels tall are drawn

@@ -14,8 +14,8 @@ Everything works by keyboard and most things by mouse too. The game screen:
     | (multiplayer) chat                                          |
     | keys help                                         frame rate |
 
-The display settings (glyphs, colours, frame rate, shadows, reflections, detail) are on the menu's Settings screen,
-kept between runs (settings.py); F2-F7 still switch them anywhere.
+The display settings (glyphs, colours, frame rate, shadows, reflections, detail, quality) are on the menu's Settings
+screen, kept between runs (settings.py); F2-F8 still switch them anywhere.
 """
 import math
 import time
@@ -140,8 +140,10 @@ class App:
         # (the default here; F7 or Settings), simpler copies of them where they differ by under a pixel (about 15%
         # faster mid-game).
         self.renderer.simplify = DisplayControls.DETAIL["standard"]
-        # Drawn: the frame rate only; the rest are on the Settings screen (and F2-F6).
-        self.controls = DisplayControls(renderer=self.renderer, show=("fps",))
+        # Drawn: the frame rate only; the rest are on the Settings screen (and F2-F8). Quality starts on auto: on a
+        # slow machine the picture steps down (edge smoothing, then detail, then sharpness; never shadows) while
+        # frames can't keep up with the frame rate; a fast one never notices.
+        self.controls = DisplayControls(renderer=self.renderer, show=("fps",), quality="auto")
         self.saved = settings.load()
         self.controls.apply({k: v for k, v in self.saved.items() if k not in fixed})  # (they wait for the screen)
         self.settings_index = 0
@@ -257,7 +259,8 @@ class App:
                 ("fps", "Frame rate", c.fps, lambda v: f"{v} fps"),
                 ("shadows", "Shadows", c.shadows, lambda v: "on" if v else "off"),
                 ("reflections", "Reflections", c.reflections, lambda v: "on" if v else "off"),
-                ("detail", "Detail", c.detail, str)]
+                ("detail", "Detail", c.detail, str),
+                ("quality", "Quality", c.quality, lambda v: {"high": "high (as set)"}.get(v, v))]
 
     # ---------------------------------------------------------------------------------------------- menu
 
@@ -371,13 +374,14 @@ class App:
         self._backdrop(screen, dt, rows, cols, "Settings")
         widgets = self._setting_widgets()
         x0, y0 = cols // 2 - 18, 6
+        gap = 2 if y0 + 2 * len(widgets) < rows - 1 else 1  # (lines closer together where the screen is short)
         self.click_zones = []
         for i, (_, title, w, shown) in enumerate(widgets + [(None, "Back", None, None)]):
             sel = i == self.settings_index
             text = f"{title:<15} < {shown(w.value)} >" if w else title
-            screen.text(y0 + 2 * i, x0 - 2, ("> " if sel else "  ") + text, Color.YELLOW if sel else Color.WHITE,
+            screen.text(y0 + gap * i, x0 - 2, ("> " if sel else "  ") + text, Color.YELLOW if sel else Color.WHITE,
                         bold=sel)
-            self.click_zones.append((x0 - 2, y0 + 2 * i, x0 + 40, y0 + 2 * i, i))
+            self.click_zones.append((x0 - 2, y0 + gap * i, x0 + 40, y0 + gap * i, i))
         help_ = "Up/Down choose  Left/Right change  Esc back  (kept for next time)"
         screen.text(rows - 1, 1, help_[:cols - self.controls.width - 3], Color.WHITE, dim=True)
         n = len(widgets) + 1

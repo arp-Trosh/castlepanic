@@ -39,13 +39,15 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   "All Players Discard 1 Card" by mouse: click a card twice (or press its number). Trading by mouse: click your card and one of theirs (or their name) in the Defenders list, either way round.
   Multiplayer chat docks in the bottom bar (a Chat tab with an unread count; click or Tab slides it up over the
   view, Esc/Tab/click docks it) and chimes softly (`chat` in sound.py) for other players' messages.
-- **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections and detail on the menu's
-  Settings screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F7 still work. Detail:
+- **Settings** (`settings.py`): characters, colours, frame rate, shadows, reflections, detail and quality on the menu's
+  Settings screen, saved to ~/.config/castlepanic/settings.json (command-line flags win); F2-F8 still work. Detail:
   standard (the default) draws small models from simpler copies within a pixel (unicode3d 0.13.0's levels of detail,
-  `Renderer.simplify` 1), high draws every model in full. The bottom bar
+  `Renderer.simplify` 1), high draws every model in full. Quality: auto (the default; unicode3d 0.14.0) steps the
+  picture down while frames can't keep up with the frame rate (edge smoothing, detail, then sharpness; never
+  shadows) and back up when they can; high keeps it as set; fast holds the lowest step. The bottom bar
   shows only the frame rate (achieved/target, clickable).
-- **unicode3d v0.13.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0 and 0.13.0
-  faster on slow machines, 0.13.0 levels of detail), pinned in requirements.txt.
+- **unicode3d v0.14.0** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0-0.14.0
+  faster on slow machines, 0.13.0 levels of detail, 0.14.0 automatic quality), pinned in requirements.txt.
 - **Sound** (`sound.py`): 36 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all. A Plague! that takes cards
   plays a sad trombone ("wah wah wahhh", `plague`) with its first discard; the Knight's charge, a war-cry over hoofbeats (`joust`).
@@ -62,7 +64,10 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   in a kernel, settled shadow casters kept, faster panel text); the laptop estimated at ~12.6 fps, to be measured.
   unicode3d v0.13.0 (2026-10-05): levels of detail at 1 pixel (half the triangles drawn) and less Python per
   object, 24.5 -> 19.5 ms a frame the same way; the laptop, with turbo on, measured 16 fps on 0.12.0 and estimated
-  at ~20 on 0.13.0, to be measured. The work and what is next: ~/Documents/Claude/unicode3dperformance.md.
+  at ~20 on 0.13.0, measured 21 fps mid-game (48 ms). unicode3d v0.14.0 (2026-10-05): faster rasterizing and
+  shading (about -3 ms on the laptop, estimated) and automatic quality (on by default here): edge smoothing off
+  and 70% of the pixels measured 46 -> 34 ms on the laptop (30 fps median); to be measured in real play. The work
+  and what is next: ~/Documents/Claude/unicode3dperformance.md.
 - Visual polish: monsters read dark at whole-board zoom; mat terrain could use scattered rocks/grass props; the
   orc warlord and barbarian previews show the agents' known issues (hands off hafts, murky colours).
 - Windows release (2026-10-03): `packaging/windows/` (embeddable Python as CastlePanic.exe, self-test, ConPTY smoke
