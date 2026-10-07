@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import unittest.mock
 
+from castlepanic.session import single_player
 from castlepanic.ui import App, _port
 from unicode3d.keys import Key
 from unicode3d.terminal import Screen
@@ -61,6 +62,38 @@ class Settings(unittest.TestCase):
             self.assertTrue(any("Back" in line for line in lines[:-1]))
             self.assertTrue(any("Quality" in line for line in lines[:-1]))
 
+
+class Chime(unittest.TestCase):
+    def test_another_players_trade_with_me_chimes_like_chat(self):
+        app = App("Test", sound=False, seed=1)
+        app.session = single_player("Test", 3, seed=1)
+        app.session.start()
+        a, b = list(app.session.game.cards)[:2]
+        heard = []
+        app.sound.play = lambda name, **kw: heard.append(name)
+        for e in ({"e": "offer", "from": 0, "to": 1, "give": a, "take": b},  # (my own doing: no chime)
+                  {"e": "offer", "from": 1, "to": 2, "give": a, "take": b},  # (between two others: no chime)
+                  {"e": "trade", "from": 1, "to": 2, "give": a, "take": b},
+                  {"e": "cancelled", "seat": 1, "from": 1, "to": 2, "give": a, "take": b}):
+            app._narrate([e])
+        self.assertEqual(heard, [])
+        for e in ({"e": "offer", "from": 1, "to": 0, "give": b, "take": a},
+                  {"e": "trade", "from": 0, "to": 1, "give": a, "take": b},
+                  {"e": "declined", "from": 0, "to": 2, "give": a, "take": b},
+                  {"e": "cancelled", "seat": 1, "from": 1, "to": 0, "give": b, "take": a}):
+            app._narrate([e])
+        self.assertEqual(heard, ["chat"] * 4)
+
+    def test_a_taken_back_offer_says_whom_it_was_to(self):
+        g = single_player("Test", 2, seed=1)
+        g.start()
+        g = g.game
+        g.phase, g.current = "trade", 0
+        g.offer_trade(0, 1, g.hands[0][0], g.hands[1][0])
+        g.take_events()
+        g.cancel_trade(0)
+        e = g.take_events()[-1]
+        self.assertEqual((e["e"], e["seat"], e["from"], e["to"]), ("cancelled", 0, 0, 1))
 
 if __name__ == "__main__":
     unittest.main()

@@ -47,6 +47,7 @@ CHAT_SLIDE = 0.3  # seconds it takes to slide up out of the bar, or back down in
 CHAT_BG = (14, 14, 20)
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 LETTER_MODES = ("target", "scavenge", "trade_take")  # choosing by letter
+TRADE_BY = {"offer": "from", "trade": "to", "declined": "to", "cancelled": "from"}  # trade events: whose doing
 HP_PIP = "●"
 RING_LABEL = {ARCHER: "Arc", KNIGHT: "Kni", SWORDSMAN: "Swo"}
 RING_LABELS_FAR = 26.0  # camera distance beyond which only one line of ring names shows
@@ -608,6 +609,8 @@ class App:
             text = describe(e, s.game, s.names) if e.get("e") != "_sync" else None
             if text:
                 s.say(text, "game")
+                if e["e"] in TRADE_BY and s.my_seat in (e["from"], e["to"]) and e[TRADE_BY[e["e"]]] != s.my_seat:
+                    self.sound.play("chat")  # (another player's trade with me: the chat chime)
 
     def _feed(self, events):
         if any(e.get("e") == "_sync" for e in events):  # (a client sent a new game: the host played again)

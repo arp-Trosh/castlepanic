@@ -395,8 +395,8 @@ class Game:
 
     def cancel_trade(self, seat):
         if self.trade_offer and self.trade_offer["from"] == seat:
+            self.events.append(Event("cancelled", seat=seat, **self.trade_offer))
             self.trade_offer = None
-            self.events.append(Event("cancelled", seat=seat))
 
     # -------------------------------------------------------------------------------- playing cards
 
