@@ -46,9 +46,10 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   picture down while frames can't keep up with the frame rate (edge smoothing, detail, then sharpness; never
   shadows) and back up when they can; high keeps it as set; fast holds the lowest step. The bottom bar
   shows only the frame rate (achieved/target, clickable).
-- **unicode3d v0.16.1** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0-0.14.0
+- **unicode3d v0.16.2** (0.11.0's camera parents, `DisplayControls(show=...)`, block lettering; 0.12.0-0.14.0
   faster on slow machines, 0.13.0 levels of detail, 0.14.0 automatic quality, 0.15.0 `Object3D.simplify` and
-  auto quality only below 20 fps, 0.16.0 cheaper shadow filtering and bookkeeping, 0.16.1 a CI fix), pinned in requirements.txt.
+  auto quality only below 20 fps, 0.16.0 cheaper shadow filtering and bookkeeping, 0.16.1 a CI fix, 0.16.2 textures
+  prepared faster), pinned in requirements.txt.
 - **Sound** (`sound.py`): 36 synthesized sounds (numpy + numba filters), played via winsound / pw-play / paplay /
   aplay / afplay; nothing to install. `python -m castlepanic.sound` plays them all. A Plague! that takes cards
   plays a sad trombone ("wah wah wahhh", `plague`) with its first discard; the Knight's charge, a war-cry over hoofbeats (`joust`).
@@ -75,7 +76,7 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   orc warlord and barbarian previews show the agents' known issues (hands off hafts, murky colours).
 - Windows release (2026-10-03): `packaging/windows/` (embeddable Python as CastlePanic.exe, self-test, ConPTY smoke
   test) built by `.github/workflows/windows-release.yml` on a `v*` tag; repo github.com/arp-Trosh/castlepanic.
-  0.9.0 is the playtest release. Still wanted: a playtest by a person in Windows Terminal.
+  0.9.0 was the first playtest release, 0.10.0 (2026-10-06) the next. Still wanted: a playtest by a person in Windows Terminal.
 - Bug hunt (2026-10-03): rules fuzz (random legal/illegal moves, garbage values: conservation, JSON round trip),
   32 whole games through the UI with random keys/clicks at 70x20-120x34 (no crash, scene matches state), a
   host+client game over localhost, malformed network messages, a pty run of `python -m castlepanic`.
