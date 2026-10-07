@@ -20,7 +20,7 @@ class Ports(unittest.TestCase):
 
 class Settings(unittest.TestCase):
     def test_detail_is_a_setting_kept_for_next_time(self):
-        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config}):
+        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config, "APPDATA": config}):
             screen = Screen(None, size=(30, 100))
             app = App("Test", sound=False, seed=1)
             app.frame(screen, 1 / 30, [])
@@ -35,7 +35,7 @@ class Settings(unittest.TestCase):
             self.assertEqual(again.renderer.simplify, 0.0)
 
     def test_quality_starts_on_auto_and_is_kept_for_next_time(self):
-        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config}):
+        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config, "APPDATA": config}):
             screen = Screen(None, size=(30, 100))
             app = App("Test", sound=False, seed=1)
             app.frame(screen, 1 / 30, [])
@@ -52,7 +52,7 @@ class Settings(unittest.TestCase):
             self.assertEqual(again.controls.auto_quality.mode, "fast")
 
     def test_every_settings_line_fits_the_smallest_screen(self):
-        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config}):
+        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config, "APPDATA": config}):
             screen = Screen(None, size=(20, 70))
             app = App("Test", sound=False, seed=1)
             app.mode = "settings"
