@@ -76,7 +76,7 @@ Playable end to end: `python -m castlepanic` (menu -> single player 1-6 / host /
   orc warlord and barbarian previews show the agents' known issues (hands off hafts, murky colours).
 - Windows release (2026-10-03): `packaging/windows/` (embeddable Python as CastlePanic.exe, self-test, ConPTY smoke
   test) built by `.github/workflows/windows-release.yml` on a `v*` tag; repo github.com/arp-Trosh/castlepanic.
-  0.9.0 was the first playtest release, 0.10.0 (2026-10-06) the next. Still wanted: a playtest by a person in Windows Terminal.
+  0.9.0 was the first playtest release, 0.10.1 (2026-10-06) the next (the v0.10.0 tag never built: two tests failed on Windows). Still wanted: a playtest by a person in Windows Terminal.
 - Bug hunt (2026-10-03): rules fuzz (random legal/illegal moves, garbage values: conservation, JSON round trip),
   32 whole games through the UI with random keys/clicks at 70x20-120x34 (no crash, scene matches state), a
   host+client game over localhost, malformed network messages, a pty run of `python -m castlepanic`.
