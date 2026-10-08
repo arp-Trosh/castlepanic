@@ -5,6 +5,9 @@ import json
 import os
 
 KEYS = ("glyphs", "color", "fps", "shadows", "reflections", "detail", "quality")
+# Values saved by older versions, under their names now: unicode3d's lowest quality preset was "fast" before
+# 0.17, and is "low".
+RENAMED = {("quality", "fast"): "low"}
 
 
 def _path():
@@ -15,13 +18,16 @@ def _path():
 
 
 def load():
-    """The saved settings: {key: value} for those saved, {} if none (or the file can't be read)."""
+    """The saved settings: {key: value} for those saved, {} if none (or the file can't be read). Values saved under
+    an old name (RENAMED) come back under the new one."""
     try:
         with open(_path()) as f:
             data = json.load(f)
     except (OSError, ValueError):
         return {}
-    return {k: v for k, v in data.items() if k in KEYS} if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: RENAMED.get((k, v), v) if isinstance(v, str) else v for k, v in data.items() if k in KEYS}
 
 
 def save(values):

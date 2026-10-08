@@ -52,6 +52,17 @@ class Settings(unittest.TestCase):
             again.frame(screen, 1 / 30, [])
             self.assertEqual(again.controls.auto_quality.mode, "low")
 
+    def test_quality_saved_as_fast_loads_as_low(self):
+        # unicode3d called its lowest quality preset "fast" before 0.17; settings saved then still load.
+        with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config, "APPDATA": config}):
+            os.makedirs(os.path.join(config, "castlepanic"))
+            with open(os.path.join(config, "castlepanic", "settings.json"), "w") as f:
+                json.dump({"quality": "fast", "detail": "high"}, f)
+            screen = Screen(None, size=(30, 100))
+            app = App("Test", sound=False, seed=1)
+            app.frame(screen, 1 / 30, [])
+            self.assertEqual((app.controls.auto_quality.mode, app.renderer.simplify), ("low", 2.0))
+
     def test_every_settings_line_fits_the_smallest_screen(self):
         with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config, "APPDATA": config}):
             screen = Screen(None, size=(20, 70))
