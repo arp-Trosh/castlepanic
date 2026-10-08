@@ -42,15 +42,15 @@ class Settings(unittest.TestCase):
             app.frame(screen, 1 / 30, [])
             self.assertEqual(app.controls.auto_quality.mode, "auto")
             app.mode, app.settings_index = "settings", 0
-            app.frame(screen, 1 / 30, [Key.DOWN] * 6 + [Key.RIGHT])  # (Quality is the seventh line: auto -> fast)
+            app.frame(screen, 1 / 30, [Key.DOWN] * 6 + [Key.LEFT])  # (Quality is the seventh line: auto -> low)
             app.frame(screen, 1 / 30, [])
-            self.assertEqual((app.controls.auto_quality.mode, app.renderer.edge_samples), ("fast", 0))
+            self.assertEqual((app.controls.auto_quality.mode, app.renderer.edge_samples), ("low", 0))
             self.assertEqual(app.controls.detail.value, "standard")  # (the user's detail, not the step's)
             with open(os.path.join(config, "castlepanic", "settings.json")) as f:
-                self.assertEqual(json.load(f)["quality"], "fast")
+                self.assertEqual(json.load(f)["quality"], "low")
             again = App("Test", sound=False, seed=1)
             again.frame(screen, 1 / 30, [])
-            self.assertEqual(again.controls.auto_quality.mode, "fast")
+            self.assertEqual(again.controls.auto_quality.mode, "low")
 
     def test_every_settings_line_fits_the_smallest_screen(self):
         with tempfile.TemporaryDirectory() as config, unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": config, "APPDATA": config}):
